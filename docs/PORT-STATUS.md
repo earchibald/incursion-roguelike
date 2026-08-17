@@ -1,7 +1,59 @@
 # Port status
 
-Last updated 2026-08-14. This is the running state of the macOS/POSIX port.
+Last updated 2026-08-16. This is the running state of the macOS/POSIX port.
 Read it before doing anything else.
+
+## Native Mac app (2026-08-16, epic inc-9df.9)
+
+A native macOS application now exists beside the SDL build. The engine is
+untouched: a new backend (`src/Wmac.cpp`) runs the whole game on a background
+thread behind the same `TextTerm` seam the other backends use, and a Swift
+app (`macapp/`) renders its Glyph grid with vector fonts and feeds it events.
+Design: `docs/superpowers/specs/2026-08-16-native-mac-app-design.md`.
+
+```
+BACKEND=mac ./build_macos.sh          # engine static library
+macapp/build_app.sh                   # dist/Incursion.app (ship engine)
+tools/check_app.sh                    # bundle correctness, exits 0 on pass
+FULL=yes tools/check_macterm.sh       # keyscript screens diff clean vs Wposix
+tools/check_macmouse.sh               # a click == its keystroke, cross-backend
+```
+
+What is proven, and how:
+- **The backend plays the same game.** Ten keyscript scenarios (smoke,
+  chargen x3, explore x4, dive, dive12) produce cell-identical screen dumps
+  and equal exit codes against `incursion-headless`, same seeds, pinned
+  options (`tools/check_macterm.sh`, PASS 2026-08-16).
+- **Mouse support with ~60 lines of engine hooks.** `KY_MOUSE` (inc/Term.h)
+  plus one case each in LMenu/LMultiSelect (`src/TextTerm.cpp`) and
+  EffectPrompt (`src/Term.cpp`); clicks re-enter the existing accept paths,
+  so validation and chargen recording are untouched. Proven by
+  `tools/check_macmouse.sh`: the same session by clicks and by keystrokes
+  dumps identical screens. Adjacent-square map clicks walk; wheel scrolls.
+- **The .app is a real bundle.** Writable state lives in
+  `~/Library/Application Support/Incursion` (or `$INCURSIONPATH` for the
+  portable layout); the module ships in Resources and is copied out on
+  version change. The bundle links no SDL, no libtcod, no GPL ACCENT code,
+  ships the assembled license document
+  (`tools/gen_app_licenses.sh`), and is ad-hoc signed (Developer ID still
+  waits on inc-9df.7).
+- Text is adjustable (View menu), palettes classic/soft, window resizes in
+  cell increments with a live grid resize (floor 80x48).
+
+The whole surface was adversarially reviewed on 2026-08-16 (45 agents, five
+dimensions, two skeptics per finding): 20 confirmed defects, all fixed the
+same day except five verified-low items deferred by choice (inc-9df.9.9).
+The review also surfaced a latent SDL-build bug: KY_REDRAW numerically IS
+KY_CMD_DOWN, so Alt+Enter during play can descend stairs (inc-upw.24,
+Traced, unsent). The parity dumps now carry a colour-and-cursor plane
+(INCURSION_DUMP_COLOR), so the oracle covers everything the app draws.
+
+![The native app's title screen](media/incursion-native-app.png)
+
+Open, tracked in beads under inc-9df.9: live human play-test of the app
+(keyboard and mouse are verified end-to-end by the headless equivalence
+checks, not yet by hand), richer About box, bundle identifier (Brian's
+call, outward-facing), Developer ID + notarization for the .app.
 
 ## OPEN: keyboard input dies — probably NOT our bug. Reboot first.
 

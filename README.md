@@ -105,6 +105,12 @@ brew install sdl2 pkg-config
 Two minutes from a clean checkout. `BACKEND=posix ./build_macos.sh` builds the
 terminal and headless binary instead.
 
+A native Mac app is in development: `BACKEND=mac ./build_macos.sh` builds the
+engine as a library, and `macapp/build_app.sh` assembles `dist/Incursion.app` —
+vector-font text at any size, mouse support, a real bundle. See the native-app
+section of [`docs/PORT-STATUS.md`](docs/PORT-STATUS.md) for what is proven and
+what remains before it becomes the shipped artifact.
+
 To produce a release image the way one is actually shipped:
 
 ```

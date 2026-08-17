@@ -117,10 +117,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
 
     // MARK: gamemaster
 
+    @MainActor
     @objc func showNarrator(_ sender: Any?) {
         NarratorWindowController.shared.show()
     }
 
+    @MainActor
     @objc func showNarratorSettings(_ sender: Any?) {
         NarratorSettingsWindowController.shared.show()
     }

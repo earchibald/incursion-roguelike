@@ -47,6 +47,11 @@ struct NarratorPaneView: View {
                         proxy.scrollTo(id, anchor: .bottom)
                     }
                 }
+                .onChange(of: engine.entries.last?.id) {
+                    if let id = engine.entries.last?.id {
+                        proxy.scrollTo(id, anchor: .bottom)
+                    }
+                }
             }
             if let status = engine.statusLine {
                 Text(status)
@@ -83,6 +88,7 @@ final class NarratorWindowController: NSObject, NSWindowDelegate {
     static let shared = NarratorWindowController()
     private var window: NSWindow?
 
+    @MainActor
     func show() {
         if window == nil {
             let w = NSWindow(
@@ -97,11 +103,11 @@ final class NarratorWindowController: NSObject, NSWindowDelegate {
             w.setFrameAutosaveName("NarratorWindow")
             window = w
         }
-        Task { @MainActor in Narrator.engine.paneOpen = true }
+        Narrator.engine.paneOpen = true
         window?.makeKeyAndOrderFront(nil)
     }
 
     func windowWillClose(_ notification: Notification) {
-        Task { @MainActor in Narrator.engine.paneOpen = false }
+        MainActor.assumeIsolated { Narrator.engine.paneOpen = false }
     }
 }

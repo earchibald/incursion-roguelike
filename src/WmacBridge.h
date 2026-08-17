@@ -56,6 +56,12 @@ typedef struct IncCallbacks {
     void (*engine_waiting)(void *ctx);          /* about to block for input */
     void (*engine_finished)(void *ctx, int rc); /* game over; terminate app */
     void (*fatal_error)(void *ctx, const char *msg); /* logged; then parks  */
+
+    /* Narrator tap (optional; null = off). Both fire on the engine thread;
+       string arguments are valid only for the duration of the call. */
+    void (*game_message)(void *ctx, const char *line); /* message-pane line */
+    void (*player_state)(void *ctx, const char *json); /* {"name":...,"level":n,
+                              "depth":n,"hp":n,"maxhp":n,"turn":n}, on change */
 } IncCallbacks;
 
 typedef struct IncEngineConfig {

@@ -113,6 +113,7 @@ private:
     bool strictQuit;
     int16 quitEscBudget;            /* ESCs left to drain dialogs on quit */
     bool quitPending;
+    char lastStateJson[256];        /* narrator tap: last published sample */
 
     /* File I/O */
     String CurrentDirectory;
@@ -138,6 +139,7 @@ public:
         strictQuit = cfg->strict_quit != 0;
         quitEscBudget = 50;
         quitPending = false;
+        lastStateJson[0] = 0;
         fp = NULL;
         findDir = NULL;
         initialised = false;
@@ -149,6 +151,8 @@ public:
 
     /* Low-Level Read/Write */
     virtual void Update();
+    virtual void Message(const char *msg);
+    void PublishPlayerState();
     virtual void CursorOn()  { showCursor = true; }
     virtual void CursorOff() { showCursor = false; }
     virtual int16 CursorX() { return cx; }
@@ -306,9 +310,46 @@ void macTerm::Update() {
         snapMode = Mode;
         snapSeq++;
     }
+    PublishPlayerState();
     if (cb.frame_ready)
         cb.frame_ready(cb.ctx);
     updated = true;
+}
+
+/* Narrator tap: every message-pane line, verbatim, before display. */
+void macTerm::Message(const char *msg) {
+    if (cb.game_message && msg && *msg)
+        cb.game_message(cb.ctx, msg);
+    TextTerm::Message(msg);
+}
+
+static void narratorEscJson(const char *in, char *out, size_t cap) {
+    size_t o = 0;
+    for (; *in && o + 2 < cap; in++) {
+        unsigned char c = (unsigned char)*in;
+        if (c == '"' || c == '\\') { out[o++] = '\\'; out[o++] = c; }
+        else if (c < 32)           { out[o++] = ' '; }
+        else                       { out[o++] = (char)c; }
+    }
+    out[o] = 0;
+}
+
+/* Narrator tap: sample the player after an update; publish on change. */
+void macTerm::PublishPlayerState() {
+    if (!cb.player_state || !p || !theGame)
+        return;
+    char nm[64];
+    narratorEscJson(p->Name(), nm, sizeof(nm));
+    char buf[256];
+    snprintf(buf, sizeof(buf),
+        "{\"name\":\"%s\",\"level\":%d,\"depth\":%d,"
+        "\"hp\":%d,\"maxhp\":%d,\"turn\":%u}",
+        nm, (int)p->TotalLevel(), (int)(p->m ? p->m->Depth : 0),
+        (int)p->cHP, (int)p->mHP, (unsigned)theGame->GetTurn());
+    if (strcmp(buf, lastStateJson) == 0)
+        return;
+    strcpy(lastStateJson, buf);
+    cb.player_state(cb.ctx, buf);
 }
 
 void macTerm::StopWatch(int16 milli) {

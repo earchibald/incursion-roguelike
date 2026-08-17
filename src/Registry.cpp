@@ -94,6 +94,40 @@ struct groupHeader
     int32  LastHandle;
   };
 
+/* upstream: LoadGroup and SaveGroup announce what they are doing by setting a
+   Registry mode flag, and they clear it only where they succeed. Every throw
+   in between -- a version mismatch, a corrupt chunk, a missing group, a failed
+   allocation -- leaves the Registry claiming it is still loading, and leaks the
+   memory file with it.
+
+   A stuck flag is not a cosmetic leak. Array<>::Array() returns WITHOUT
+   initialising itself while theRegistry->Loading() is true (src/Base.cpp:537),
+   because an object rebuilt from a file must keep the array it was saved with,
+   not a fresh empty one. So the NEXT LoadGroup's own LoadedObjects is stack
+   garbage from the moment it is declared, and unwinding the next throw hands
+   that garbage to free(): "pointer being freed was not allocated", abort.
+
+   Observed on 2026-08-16: a module whose stamp does not match is refused
+   cleanly the first time and kills the game the SECOND time, every time,
+   reproduced under lldb in the headless build. Upstream's defect and not this
+   port's -- no typedef, compiler or platform of the port is involved, the
+   throw sites and the flags are the original code, and the same source on
+   Win32 fails the same way. inc-upw.25. Unsent.
+
+   The flag is restored however the function leaves, which is the only way to
+   state the invariant once instead of at every exit. */
+class RegistryScope
+  {
+    bool  &flag;
+    CFile **cf;
+    public:
+      RegistryScope(bool &f, CFile **c) : flag(f), cf(c) { }
+      ~RegistryScope()
+        { flag = false;
+          if (*cf)
+            { delete *cf; *cf = NULL; } }
+  };
+
 Registry::Registry()
   {
     memset(ObjTable,0,sizeof(RegNode)*OBJ_TABLE_SIZE);
@@ -477,6 +511,11 @@ DoneDeletion:
 
     /* Initialize the Memory File */
     CFile *cf = new CFile(&t);
+    /* Same guard as LoadGroup's, for the same reason: a write that fails --
+       a full disk is the ordinary way -- must not leave the Registry stuck in
+       saving mode, where Registry::Block takes the wrong branch for every
+       object serialised afterwards. See RegistryScope. inc-upw.25. */
+    RegistryScope guard(saveMode, &cf);
 
     /* Write the objects in sequential order, each with a single byte in
     front of it to tell its type. */
@@ -556,9 +595,11 @@ DoneDeletion:
     t.FWrite(&gh,sizeof(gh));
 
     delete cf;
+    cf = NULL;
 
     /* Fix all the pointers in memory to data blocks, so that they point
-    properly again. */
+    properly again. This loop MUST run with saveMode off, so the flag is
+    cleared here and not left to the guard. */
     saveMode = 0;
     for(i=0;i!=OBJ_TABLE_SIZE;i++) {
         if (ObjTable[i].pObj) {
@@ -590,6 +631,11 @@ int16 Registry::LoadGroup(Term &t, hObj hGroup, bool use_lz) {
     hData  DataHandle;
     uint32 DataSize;
     uint32 Seperator;
+    /* Declared here, and NOT at the label below, so that the guard covers the
+       throws above it and so that "goto foundGroup" no longer jumps across an
+       initialisation. See RegistryScope. */
+    CFile *cf = NULL;
+    RegistryScope guard(loadMode, &cf);
 
     ClearDataTable();
 
@@ -619,7 +665,7 @@ int16 Registry::LoadGroup(Term &t, hObj hGroup, bool use_lz) {
     throw ENOCHUNK;
 
 foundGroup:
-    CFile *cf = new CFile(&t);
+    cf = new CFile(&t);
     cf->LoadCompressed(t.Tell(), gh.compSize, gh.groupSize, use_lz);
 
     LastUsedHandle = max(LastUsedHandle, gh.LastHandle);
@@ -737,10 +783,8 @@ foundGroup:
       (*(LoadedObjects[i]))->Serialize(*this,false);
       }
 
-    loadMode = false;
-    
-    delete cf;
-    
+    /* loadMode and cf are cleared by the guard, on this path and on every
+       throw above. Clearing them here as well would only say it twice. */
     return 0;
 }
 

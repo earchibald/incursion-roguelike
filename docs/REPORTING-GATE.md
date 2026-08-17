@@ -131,6 +131,7 @@ literal text that will be published.
 |---|---|---|---|
 | `Character::HasFeat` never read a race's Monster template, so players silently lost every racial feat that was not also an explicit `Grants:` entry -- 8 feats across 6 races (`src/Create.cpp`) | **Observed** -- same seed and key script; Dragonkin sheet had no Mantis Leap before, has it after | no | inc-2a0 |
 | Two empty hands produced one strike per swing forever, while two weapons produced two. `AttackMode()` returns `S_BRAWL` before the `S_DUAL` test is reached, so no feat could ever apply to fists (`src/Creature.cpp`, `src/Fight.cpp`) | **Observed** -- same seed; `Hit:2 / -3` and one Punch before, `Hit:2 / 2` and two Punches after | no | inc-dzz |
+| A load that throws leaves `loadMode` set, so the next `Array` built anywhere skips its own constructor (`src/Base.cpp:537` does that on purpose for objects restored from a file). The next `LoadGroup` then frees the stack garbage in its `LoadedObjects` (`src/Registry.cpp`) | **Observed** -- a module the binary refuses is refused cleanly once and aborts in `malloc` on the second attempt, 6/6 attempts clean after the fix | no | inc-upw.25 |
 
 **This table is incomplete, and knowingly so.** The convention dates from
 2026-08-16; every defect this port fixed before that is unmarked and unlisted.

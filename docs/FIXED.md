@@ -115,6 +115,34 @@ measured nothing must never be read as a pass.
 
 ---
 
+## The shipping app refused its own game data
+
+The first native Mac app to be run by hand died on the first menu choice. It had
+passed every automated check, and the checks were not wrong — they had all run
+the *developer* build.
+
+**A member behind `#ifdef DEBUG` changed the save format id.** `SaveFormatID()`
+digests the layout of the types a file contains, and `sizeof(Registry)` is one
+of its inputs. `Registry` declared `FILE *reg_log` only under `-DDEBUG`, so the
+shipping build (`COMPILER=no`, which drops `-DDEBUG`) computed `SFD3A51B74`
+where the developer binary that compiles the module computes `SF0F7B6EDC`. The
+app refused every module and every save with *File Version Mismatch*. The member
+is now declared in every build — which keeps the existing id, so no file already
+written was invalidated — and `tools/check_abi.sh` builds the digest six ways
+and fails if they disagree. Verified: the check fails on the old header and
+passes on the new one, and the shipping engine now plays a full scripted session
+against a developer-built module.
+
+**Refusing the module then crashed the game.** `Registry::LoadGroup` sets
+`loadMode` on entry and clears it only where it succeeds, so the throw left the
+Registry claiming it was still loading. `Array<>::Array()` deliberately does not
+initialise itself while the Registry is loading — an object rebuilt from a file
+must keep the array it was saved with — so the *next* `LoadGroup`'s own array
+was stack garbage, and unwinding the next throw handed that garbage to `free()`.
+Refused cleanly the first time, `abort()` the second, every time. The flag and
+the memory file are now restored however the function leaves. This one is
+upstream's, and is marked and listed as such.
+
 ## The full list
 
 Work is tracked in [Beads](https://github.com/gastownhall/beads), in the

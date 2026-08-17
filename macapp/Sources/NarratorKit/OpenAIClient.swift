@@ -50,6 +50,9 @@ public final class OpenAIClient {
             .data.map(\.id).sorted()
     }
 
+    /// Stream a chat completion. Deltas arrive on an arbitrary executor as the stream is
+    /// read; the callback must be thread-safe. Callers updating UI must dispatch to the
+    /// main actor themselves.
     public func streamChat(messages: [ChatMessage], temperature: Double,
                            maxTokens: Int,
                            onDelta: @escaping @Sendable (String) -> Void)

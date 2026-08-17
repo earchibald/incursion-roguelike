@@ -54,6 +54,17 @@ final class PromptBuilderTests: XCTestCase {
         XCTAssertTrue(s.hasPrefix(#"{"model":"m","temperature":0.5,"#))
     }
 
+    func testReplaceSystemKeepsJournalChangesOnlySystem() {
+        var b = PromptBuilder(system: "old system")
+        b.record(user: "u1", assistant: "a1")
+        b.replaceSystem("new system")
+        let msgs = b.request(userTurn: "u2")
+        XCTAssertEqual(msgs.map(\.role), ["system", "user", "assistant", "user"])
+        XCTAssertEqual(msgs[0].content, "new system")
+        XCTAssertEqual(msgs[1].content, "u1")
+        XCTAssertEqual(msgs[2].content, "a1")
+    }
+
     func testEveryPromptHasNonEmptyDefault() {
         for key in PromptKey.allCases {
             XCTAssertFalse(key.defaultText.isEmpty, key.rawValue)

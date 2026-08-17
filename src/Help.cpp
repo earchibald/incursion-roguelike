@@ -2000,6 +2000,283 @@ void Game::WriteHTMLHelp()
     T1->Clear();
 }
 
+/*****************************************************************************\
+*                                    HELP                                     *
+*                          Export for the native app                          *
+\*****************************************************************************/
+
+/*     The manual is not a file. Half of it is written by hand in lib/help.irh
+   and half is generated from whatever module is loaded -- every race, class,
+   feat, skill, spell and god the ruleset actually defines. So the only honest
+   source for a help viewer outside the game is the game itself, and that is
+   what this writes: one JSON document holding every manual topic, produced by
+   the same GetHelp() the in-game viewer calls.
+
+     Why JSON and not the HTML that WriteHTMLHelp() already emits: that HTML
+   encodes each of the sixteen colours as a different depth of nested <b>, which
+   no reader can undo, and it is written for a 1990s browser layout with
+   background images. A viewer wants the text, its colour and its links, which
+   is exactly what the run list below carries.
+
+     The markup being decoded here is TextTerm::SWrite's (src/TextTerm.cpp):
+   a byte in -1..-15 sets the colour, '_' is a hard space, '~' is a percent
+   sign, {K:topic} is a link whose visible text is the key K, and the three
+   wrap and literal controls are layout hints a proportional reader does not
+   want. Decoding it HERE rather than in the reader keeps that knowledge in the
+   engine that owns it. */
+
+static void JsonEscape(String &out, const char *s, int32 len)
+  {
+    int32 i;
+    for (i = 0; i != len; i++)
+      {
+        unsigned char c = (unsigned char)s[i];
+        switch (c)
+          {
+            case '"':  out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\n': out += "\\n";  break;
+            case '\r': out += "\\r";  break;
+            case '\t': out += "\\t";  break;
+            default:
+              if (c < 0x20)
+                out += Format("\\u%04x", (int)c);
+              else
+                out += (char)c;
+          }
+      }
+  }
+
+/* One topic's text becomes a list of runs: {"c":colour,"s":text} for prose and
+   {"c":colour,"s":key,"to":topic} for a link. */
+static void HelpRuns(String &out, const char *text)
+  {
+    String buf;
+    int16 colour = GREY;
+    bool first = true;
+    const char *ch = text;
+
+    #define FLUSH_RUN() \
+      if (buf.GetLength()) \
+        { out += first ? "" : ",\n      "; first = false; \
+          out += Format("{\"c\":%d,\"s\":\"", (int)colour); \
+          JsonEscape(out, (const char*)buf, buf.GetLength()); \
+          out += "\"}"; buf.Empty(); }
+
+    while (*ch)
+      {
+        signed char c = (signed char)*ch;
+
+        /* A colour change ends the run before it. */
+        if (c < 0 && c > -16)
+          { FLUSH_RUN(); colour = (int16)(-c); ch++; continue; }
+
+        if (c == LITERAL_CHAR)
+          { /* A glyph id smuggled through the text stream. The low byte is the
+               character for the code page the game draws with; a reader that
+               has no code page is better served by the question mark than by a
+               byte it would render as a random accent. */
+            if (ch[1] && ch[2]) ch += 3; else break;
+            buf += '?'; continue; }
+        if (c == WRAP_BREAK || c == WRAP_INDENT)
+          { ch++; continue; }
+
+        if (*ch == '{')
+          { /* {K:topic} or {KK:topic}. The key is what the in-game viewer
+               prints, in angle brackets; the topic is where it goes. */
+            char key[3]; String dest;
+            const char *p = ch + 1;
+            key[0] = key[1] = key[2] = 0;
+            if (!isalnum((unsigned char)*p))
+              { buf += *ch++; continue; }
+            key[0] = *p++;
+            if (isalnum((unsigned char)*p) && (p[1] == ':' || p[1] == '}'))
+              key[1] = *p++;
+            /* {K} with no topic is an anchor: in-game it marks a line the
+               reader can jump to by pressing K, and a reference page puts
+               the same marker in its contents list and again at the entry
+               itself. Exported as an anchor run so a viewer can do the same
+               jump; the visible text is the key, as in the game. */
+            if (*p == '}')
+              { FLUSH_RUN();
+                out += first ? "" : ",\n      "; first = false;
+                out += "{\"c\":15,\"s\":\"";
+                JsonEscape(out, key, (int32)strlen(key));
+                out += "\",\"anchor\":\"";
+                JsonEscape(out, key, (int32)strlen(key));
+                out += "\"}";
+                ch = p + 1; continue; }
+            if (*p != ':')
+              { buf += *ch++; continue; }
+            p++;
+            while (isalnum((unsigned char)*p) || isspace((unsigned char)*p))
+              { dest += *p; p++; }
+            if (*p != '}')
+              { buf += *ch++; continue; }
+            FLUSH_RUN();
+            out += first ? "" : ",\n      "; first = false;
+            out += "{\"c\":15,\"s\":\"";
+            JsonEscape(out, key, (int32)strlen(key));
+            out += "\",\"to\":\"";
+            JsonEscape(out, (const char*)dest, dest.GetLength());
+            out += "\"}";
+            ch = p + 1;
+            continue;
+          }
+
+        if (*ch == '~')      buf += '%';
+        else if (*ch == '_') buf += ' ';
+        else                 buf += *ch;
+        ch++;
+      }
+    FLUSH_RUN();
+    #undef FLUSH_RUN
+  }
+
+struct HelpTopicName
+  {
+    const char *title;
+    const char *topic;
+    /* Where a reader looks for it: "manual" is the chapters written by hand,
+       "reference" is the lists generated from the loaded module, "legal" is
+       the licence. A viewer should not have to guess this from the id. */
+    const char *section;
+  };
+
+bool Game::WriteHelpExport(const char *filename)
+  {
+    /* Every topic the in-game manual offers, except "custom" (My Character),
+       which describes a character that does not exist outside a game. */
+    HelpTopicName Topics[] = {
+      { "Introduction",              "intro", "manual" },
+      { "Character Generation",      "chargen", "manual" },
+      { "The User Interface",        "interface", "manual" },
+      { "Command Listing",           "commands", "manual" },
+      { "Adventuring",               "adventuring", "manual" },
+      { "Combat",                    "combat", "manual" },
+      { "Magic and Spellcasting",    "magic", "manual" },
+      { "The Overland Map",          "overland", "manual" },
+      { "Contents",                  "mainmenu", "manual" },
+      { "Races and Subraces",        "races", "reference" },
+      { "Classes",                   "classes", "reference" },
+      { "Feats",                     "feats", "reference" },
+      { "Skills",                    "skills", "reference" },
+      { "The Theyran Pantheon",      "pantheon", "reference" },
+      { "Domains",                   "domains", "reference" },
+      { "Spell Index",               "spell index", "reference" },
+      { "Wizard Spells",             "arcane spells", "reference" },
+      { "Priest Spells",             "divine spells", "reference" },
+      { "Druid Spells",              "druid spells", "reference" },
+      { "Other Spells",              "other spells", "reference" },
+      { "Alchemy, Psionics, Poisons","powers", "reference" },
+      { "The Open Gaming Licence",   "OGL", "legal" },
+      { NULL, NULL, NULL } };
+    /* The curated list above is the table of contents. It is NOT the whole
+       manual: pages link to topics that have no place in a contents list --
+       "alchemy" and "psionics" from the powers page, a description for every
+       skill -- and a link that lands nowhere is worse than no link. So every
+       target reachable from an exported page is followed, and anything that
+       resolves is exported too, marked as not belonging to the contents. */
+    #define MAX_HELP_TOPICS 256
+    String ids[MAX_HELP_TOPICS], titles[MAX_HELP_TOPICS], sections[MAX_HELP_TOPICS];
+    bool   inContents[MAX_HELP_TOPICS];
+    int16  count = 0, done = 0, skipped = 0;
+    bool   wrote = false;
+    String out, text;
+    FILE *f;
+    int16 i, j;
+
+    /* Opened BEFORE the modules load, because loading changes the working
+       directory: a relative path given on the command line means what it
+       meant when the command was typed, not what it would mean from inside
+       the module folder. */
+    f = fopen(filename, "wb");
+    if (!f)
+      { printf("Cannot write '%s'.\n", filename); return false; }
+
+    if (!LoadModules())
+      { printf("Cannot load modules; no help to export.\n");
+        fclose(f); return false; }
+
+    for (i = 0; Topics[i].title && count < MAX_HELP_TOPICS; i++)
+      { ids[count] = Topics[i].topic;
+        titles[count] = Topics[i].title;
+        sections[count] = Topics[i].section;
+        inContents[count] = true;
+        count++; }
+
+    isHTML = false;
+    out = "{\n  \"topics\": [\n";
+    for (done = 0; done != count; done++)
+      {
+        text.Empty();
+        ((TextTerm*)T1)->GetHelp(text, SC("help::") + SC((const char*)ids[done]));
+        if (!text.GetLength())
+          { printf("warning: help topic '%s' is empty\n", (const char*)ids[done]);
+            skipped++; continue; }
+
+        /* Follow this page's links before writing it. */
+        for (const char *ch = (const char*)text; *ch; ch++)
+          {
+            String dest;
+            const char *p;
+            if (*ch != '{')
+              continue;
+            p = ch + 1;
+            while (isalnum((unsigned char)*p))
+              p++;
+            if (*p != ':')
+              continue;
+            p++;
+            while (isalnum((unsigned char)*p) || isspace((unsigned char)*p))
+              { dest += *p; p++; }
+            if (*p != '}' || !dest.GetLength())
+              continue;
+            /* "custom" is My Character, which needs a live character. */
+            if (!stricmp((const char*)dest, "custom"))
+              continue;
+            for (j = 0; j != count; j++)
+              if (!stricmp((const char*)ids[j], (const char*)dest))
+                break;
+            if (j != count || count == MAX_HELP_TOPICS)
+              continue;
+            if (!FIND(SC("help::") + SC((const char*)dest)))
+              continue;
+            ids[count] = dest;
+            titles[count] = dest;
+            titles[count].Capitalize(true);
+            sections[count] = sections[done];
+            inContents[count] = false;
+            count++;
+          }
+
+        if (wrote) out += ",\n";
+        wrote = true;
+        out += "    {\"id\":\"";
+        JsonEscape(out, (const char*)ids[done], ids[done].GetLength());
+        out += "\",\"title\":\"";
+        JsonEscape(out, (const char*)titles[done], titles[done].GetLength());
+        out += "\",\"section\":\"";
+        JsonEscape(out, (const char*)sections[done], sections[done].GetLength());
+        out += "\",\"contents\":";
+        out += inContents[done] ? "true" : "false";
+        out += ",\"runs\":[\n      ";
+        HelpRuns(out, (const char*)text);
+        out += "\n    ]}";
+      }
+    out += "\n  ]\n}\n";
+    i = (int16)(count - skipped);
+
+    /* Written with stdio and not through Term: this runs before the display
+       exists, and the path is one the caller chose rather than one of the
+       game's own subdirectories. */
+    fwrite((const char*)out, 1, out.GetLength(), f);
+    fclose(f);
+    printf("Wrote %s (%d topics, %d bytes).\n",
+           filename, (int)i, (int)out.GetLength());
+    return true;
+  }
+
 String & Creature::Describe(Player *p) {
     return Name(NA_LONG);
 }

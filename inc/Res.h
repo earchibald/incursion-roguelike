@@ -1132,6 +1132,7 @@ class Game : public Object
       void ListItemsByLevel();
       void MemoryStats();
       void WriteHTMLHelp();
+      bool WriteHelpExport(const char *filename);
       void NewGame(rID mID, bool reincarnate);
       bool LoadGame(bool backup);
       bool SaveGame(Player &p);

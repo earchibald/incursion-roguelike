@@ -66,6 +66,23 @@ bool TextTerm::RunOnCommandLine(int argc, char *argv[], int *retval) {
             *retval = 19; // -compile argument given for release build.
 #endif
             return true;
+        } else if (stricmp(option_names[j], "exporthelp") == 0) {
+            /* Writes the whole in-game manual, generated reference lists and
+               all, as one JSON document for the native app's help window.
+               Present in every build: it needs a module, not the resource
+               compiler, so no GPL code is involved. Runs before the display
+               is initialised, which is why the exporter prints rather than
+               draws. */
+            /* Read straight from argv. The option table above truncates a
+               value at 49 characters, which silently writes the manual to a
+               half-named file -- and an absolute path passes 49 easily. */
+            const char *path = "help.json";
+            for (int i = 1; i + 1 < argc; i++)
+                if (!stricmp(argv[i], "-exporthelp"))
+                    { path = argv[i + 1]; break; }
+            if (!theGame->WriteHelpExport(path))
+                *retval = 21;
+            return true;
         } else if (stricmp(option_names[j], "version") == 0) {
             /* Report what this build IS, and what it came from. A bare
                upstream version here would misidentify the binary. */

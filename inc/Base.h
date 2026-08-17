@@ -561,9 +561,16 @@ class Registry
     bool saveMode, loadMode;
     hObj hCurrent;
     FILE *fp;
-    #ifdef DEBUG
-      FILE *reg_log;
-    #endif
+    /* Declared in EVERY build, and it must stay that way even though only a
+       DEBUG build writes to it. sizeof(Registry) is an input to
+       SaveLayoutDigest() (src/AbiCheck.cpp), which keys every module and save
+       file, so a member that exists in one build configuration and not another
+       gives the two builds different save-format ids. It did: the shipping
+       .app (COMPILER=no, hence no -DDEBUG) refused every module and save the
+       developer binary wrote, with "File Version Mismatch", and refusing the
+       module then walked into the crash inc-upw.25 describes. inc-9df.10.
+       tools/check_abi.sh proves the two configurations still agree. */
+    FILE *reg_log;
     public:
     hObj LastUsedHandle, hModule;
 

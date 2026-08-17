@@ -25,7 +25,10 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 APP="$ROOT/dist/Incursion.app"
-SWIFT_ENV=()
+# "env" and nothing else, NOT an empty array: /bin/bash on macOS is 3.2, where
+# expanding an empty array under "set -u" is an unbound-variable error and kills
+# the build after it has already done ten minutes of work.
+SWIFT_ENV=(env)
 # SwiftUI-era toolchains fail under bare CommandLineTools on this machine;
 # use the full Xcode when it is present. See docs/PORT-STATUS.md.
 if [ -d /Applications/Xcode.app ] && ! xcodebuild -version >/dev/null 2>&1; then

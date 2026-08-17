@@ -50,6 +50,20 @@ Traced, unsent). The parity dumps now carry a colour-and-cursor plane
 
 ![The native app's title screen](media/incursion-native-app.png)
 
+**What none of that caught, and why (2026-08-16).** The first run by hand died
+on the first menu choice: the shipping bundle refused its own game data (*File
+Version Mismatch*) and then aborted in `malloc` on the second attempt. Every
+check above had run the DEVELOPER build of the engine, and the two builds had
+different save-format ids — `sizeof(Registry)` is a digest input and `Registry`
+carried a member behind `#ifdef DEBUG`. Both defects are fixed and described in
+[`FIXED.md`](FIXED.md) (inc-9df.10, inc-upw.25); `tools/check_abi.sh` now builds
+the digest six ways and fails if they disagree. The lesson is narrower than
+"test by hand": **an oracle that never runs the artifact being shipped is not an
+oracle for it.** `tools/check_macterm.sh` still runs the developer library,
+because it needs the compiler; the ship variant is exercised by building
+`PARITY=yes COMPILER=no BACKEND=mac` and running one scripted session through
+it.
+
 Open, tracked in beads under inc-9df.9: live human play-test of the app
 (keyboard and mouse are verified end-to-end by the headless equivalence
 checks, not yet by hand), richer About box, bundle identifier (Brian's

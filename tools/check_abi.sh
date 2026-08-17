@@ -16,6 +16,16 @@
 #    -Wint-to-pointer-cast, but the build passes -w, so the warnings never
 #    appear. This step re-runs the compiler with just those two warnings on.
 #
+# 3. ONE SAVE FORMAT ID FOR EVERY BUILD. SaveFormatID() digests the layout of
+#    the types the save format writes, and every module and save file is keyed
+#    on it. It must therefore be the same number in every configuration this
+#    repository builds: a backend or a -DDEBUG must not change it. One did.
+#    Registry declared a member under #ifdef DEBUG, sizeof(Registry) is a
+#    digest input, and so the shipping .app refused every module and save the
+#    developer binary wrote -- "File Version Mismatch", then a crash
+#    (inc-9df.10, inc-upw.25). This step builds the digest six ways and
+#    requires one answer.
+#
 # The KNOWN list below is an allowlist of sites that are already reported and
 # accepted. It held two entries when this check was written; both were fixed
 # under inc-upw.1 / gh-5, so it is now empty. Keep it that way -- a new hit is
@@ -44,6 +54,43 @@ if [ -n "$OUT" ]; then
     exit 1
 fi
 echo "PASS: type widths match what the save format expects"
+
+# --- 3. one save format id for every build ---------------------------------
+# The id is computed at compile time, so reading it means running a program.
+# AbiCheck.cpp links on its own -- it calls nothing else in the engine -- so
+# this costs two translation units per configuration and no engine build.
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/incursion-abi.XXXXXX")"
+trap 'rm -rf "$WORK"' EXIT
+cat > "$WORK/sfid.cpp" <<'EOF'
+#include "Incursion.h"
+#include <cstdio>
+int main(void) { printf("%s\n", SaveFormatID()); return 0; }
+EOF
+
+IDS=""
+for backend in LIBTCOD_TERM POSIX_TERM MAC_TERM; do
+    for dbg in "-DDEBUG" ""; do
+        cfg="$backend${dbg:+ +DEBUG}"
+        if ! clang++ -std=c++17 -w -fpermissive -Wno-narrowing \
+                $dbg "-D$backend" $INCLUDES \
+                "$WORK/sfid.cpp" src/AbiCheck.cpp -o "$WORK/sfid" 2>"$WORK/err"; then
+            echo "FAIL: could not build the save-format id for $cfg"
+            sed 's/^/  /' "$WORK/err"
+            exit 1
+        fi
+        IDS="$IDS$("$WORK/sfid") $cfg
+"
+    done
+done
+
+if [ "$(echo "$IDS" | awk 'NF{print $1}' | sort -u | wc -l | tr -d ' ')" != 1 ]; then
+    echo "FAIL: the save-format id depends on the build configuration."
+    echo "$IDS" | grep . | sed 's/^/  /'
+    echo "Every build must read every other build's modules and saves. Find the"
+    echo "type in SaveLayoutDigest() whose size moves, and stop it moving."
+    exit 1
+fi
+echo "PASS: one save-format id ($(echo "$IDS" | awk 'NF{print $1}' | head -1)) across all six build configurations"
 
 # --- 2. handle/pointer confusion -------------------------------------------
 sweep() {

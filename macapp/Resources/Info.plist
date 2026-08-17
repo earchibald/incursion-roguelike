@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The bundle identifier is a DEV PLACEHOLDER. The real identifier is
+	     outward-facing naming and Brian chooses it before anything ships;
+	     see the design spec's open questions. -->
+	<key>CFBundleIdentifier</key>
+	<string>local.incursion.dev</string>
+	<key>CFBundleName</key>
+	<string>Incursion</string>
+	<key>CFBundleDisplayName</key>
+	<string>Incursion</string>
+	<key>CFBundleExecutable</key>
+	<string>Incursion</string>
+	<key>CFBundleIconFile</key>
+	<string>Incursion</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0-dev</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.role-playing-games</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright 1999-2007 Julian Mensch, 2014 Richard Tew, 2026 Brian Hill.</string>
+</dict>
+</plist>

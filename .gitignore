@@ -46,3 +46,6 @@ incursion-debug
 
 # Release artifacts, produced by tools/package_macos.sh.
 dist/
+
+# SwiftPM build products for the native Mac app.
+macapp/.build/

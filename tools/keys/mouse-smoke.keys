@@ -1,0 +1,42 @@
+# Exercise the KY_MOUSE path end-to-end with no window. Mac driver only --
+# @click does not exist in the posix backend, so this script must never go
+# into check_macterm.sh's parity pairs.
+#
+# tools/keys/mouse-smoke-kb.keys is this script with every click replaced by
+# the keystroke that should do the same thing; tools/check_macmouse.sh runs
+# the pair and diffs the screens. Identical screens mean a click IS its key.
+#
+#   General Help   LMenu hit-testing: the click lands mid-label in column 2
+#                  of the two-column initial-choices menu and must select
+#                  [g] exactly as pressing g would.
+#   @              EffectPrompt targeting: 'l'ook opens the prompt; clicking
+#                  the player's own glyph must resolve the square through
+#                  the same validation ENTER-on-self runs.
+
+@click "General Help"
+@dump:help
+ESC
+@dump:menu-again
+
+@include chargen.keys
+@dump:arrival
+
+# Walk one square east by clicking the cell beside the player. Must equal
+# pressing RIGHT, including the message-window housekeeping every keystroke
+# runs.
+@clickrel 1 0
+@dump:stepped
+
+# Scroll the message history by wheel; must equal two UP arrows.
+v
+@wheel 2
+@dump:scrolled
+ESC
+
+l
+@click "@"
+@dump:looked
+ENTER
+ESC
+@dump:done
+@quit

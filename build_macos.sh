@@ -28,12 +28,20 @@ cd "$ROOT"
 #   libtcod  the SDL window build; the way to play.
 #   posix    src/Wposix.cpp, which needs neither SDL nor libtcod and can run
 #            with no display and no keyboard. See docs/HEADLESS-SPEC.md.
+#   mac      src/Wmac.cpp, the native-app bridge. Produces a static library
+#            (build/<OUT>.a) for the Swift app in macapp/ instead of a binary.
+#            See docs/superpowers/specs/2026-08-16-native-mac-app-design.md.
 BACKEND="${BACKEND:-libtcod}"
 
 case "$BACKEND" in
     libtcod) OUT="${OUT:-incursion}" ;;
     posix)   OUT="${OUT:-incursion-headless}" ;;
-    *)       echo "Unknown BACKEND '$BACKEND' (want libtcod or posix)"; exit 1 ;;
+    mac)     if [ "${COMPILER:-yes}" = no ]; then
+                 OUT="${OUT:-libincursion-mac-ship}"
+             else
+                 OUT="${OUT:-libincursion-mac}"
+             fi ;;
+    *)       echo "Unknown BACKEND '$BACKEND' (want libtcod, posix or mac)"; exit 1 ;;
 esac
 
 # Is the resource compiler part of this binary?
@@ -110,6 +118,14 @@ if [ "$BACKEND" = posix ]; then
     # no dependency to install. It is used only to draw to a real terminal;
     # a headless run never calls into it.
     LINK_LIBS="-lz -lncurses"
+elif [ "$BACKEND" = mac ]; then
+    SDL_CFLAGS=""
+    SDL_LIBS=""
+    INCLUDES="-Iinc -Ilib -Icompat"
+    DEFINES="$DEBUG_DEFINE -DMAC_TERM"
+    SKIP_BACKENDS="Wlibtcod Wcurses Wposix"
+    # The library does not link; the Swift app supplies -lz and libc++.
+    LINK_LIBS=""
 else
     SDL_CFLAGS="$(pkg-config --cflags sdl2)"
     SDL_LIBS="$(pkg-config --libs sdl2)"
@@ -123,7 +139,7 @@ fi
 # Built from the vendored copy. The bundled zlib is too old to compile against
 # a modern SDK (it redefines fdopen), so it is skipped in favour of system -lz.
 TCODLIB="$ROOT/build/libtcod_local.a"
-if [ "$BACKEND" = posix ]; then
+if [ "$BACKEND" = posix ] || [ "$BACKEND" = mac ]; then
     TCODLIB=""
 elif [ ! -f "$TCODLIB" ]; then
     echo "--- building vendored libtcod ---"
@@ -146,6 +162,12 @@ fi
 echo "--- compiling Incursion ---"
 CXXFLAGS="-O2 -w -fpermissive -Wno-narrowing $DEFINES $INCLUDES $EXTRA_CXXFLAGS"
 CFLAGS="-O2 -w -Wno-implicit-function-declaration -Wno-implicit-int -Wno-return-mismatch $DEBUG_DEFINE -Iinc -Ilib -Icompat"
+if [ "$BACKEND" = mac ]; then
+    # The Swift app targets macOS 14; the library must not claim newer, or
+    # every link prints a warning and an older Mac refuses the binary.
+    CXXFLAGS="$CXXFLAGS -mmacosx-version-min=14.0"
+    CFLAGS="$CFLAGS -mmacosx-version-min=14.0"
+fi
 
 for f in src/*.cpp; do
     n="$(basename "$f" .cpp)"
@@ -172,6 +194,25 @@ for f in src/*.c; do
     fi
     clang -std=gnu89 $CFLAGS -c "$f" -o "$OBJ/c_$n.o"
 done
+
+if [ "$BACKEND" = mac ]; then
+    # A library, not a binary. It cannot run -compile, so the game-data step
+    # below is skipped; the module comes from the classic developer binary.
+    echo "--- archiving ---"
+    ar rcs "$ROOT/build/$OUT.a" "$OBJ"/*.o
+    echo
+    echo "Built: $ROOT/build/$OUT.a"
+    # PARITY=yes also builds the headless driver that runs tools/keys scripts
+    # through this backend for tools/check_macterm.sh.
+    if [ "${PARITY:-no}" = yes ]; then
+        echo "--- building parity driver ---"
+        clang++ -std=c++17 -O2 -Iinc -Isrc $EXTRA_LDFLAGS \
+            tools/macterm_parity.cpp "$ROOT/build/$OUT.a" -lz \
+            -o "$ROOT/build/macterm-parity"
+        echo "Built: $ROOT/build/macterm-parity"
+    fi
+    exit 0
+fi
 
 echo "--- linking ---"
 clang++ -std=c++17 $EXTRA_LDFLAGS -o "$ROOT/$OUT" "$OBJ"/*.o $TCODLIB $SDL_LIBS $LINK_LIBS

@@ -775,6 +775,23 @@ void posixTerm::DumpScreen(const char *label) {
         fprintf(f, "%s\n", line);
     }
 
+    /* INCURSION_DUMP_COLOR adds what the ASCII fold discards -- the colour
+       nibbles and the cursor -- so a backend that renders colour (the mac
+       bridge) can be diffed on everything it actually draws. Off by
+       default: the gate baselines predate it. */
+    if (getenv("INCURSION_DUMP_COLOR")) {
+        fprintf(f, "--- colours ---\n");
+        for (y = 0; y < SCREEN_H; y++) {
+            for (x = 0; x < SCREEN_W; x++)
+                fprintf(f, "%02x", (unsigned)GLYPH_COLOUR_VALUE(scr[y][x]));
+            fprintf(f, "\n");
+        }
+        if (showCursor)
+            fprintf(f, "cursor %d %d 1\n", (int)cx, (int)cy);
+        else
+            fprintf(f, "cursor -1 -1 0\n");
+    }
+
     fclose(f);
 }
 

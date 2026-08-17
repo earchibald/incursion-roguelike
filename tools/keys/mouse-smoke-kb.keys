@@ -1,0 +1,30 @@
+# The keyboard twin of mouse-smoke.keys: every @click replaced by the
+# keystroke that should be its exact equal. tools/check_macmouse.sh runs the
+# pair -- this one through the posix backend, the mouse one through the mac
+# driver -- and diffs the screens; see that script for what a match proves.
+
+g
+@dump:help
+ESC
+@dump:menu-again
+
+@include chargen.keys
+@dump:arrival
+
+# The keyboard equal of clicking the square east of the player.
+RIGHT
+@dump:stepped
+
+# The keyboard equal of two wheel-up lines in the message history.
+v
+UP UP
+@dump:scrolled
+ESC
+
+l
+ENTER
+@dump:looked
+ENTER
+ESC
+@dump:done
+@quit

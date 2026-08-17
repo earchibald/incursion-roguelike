@@ -2084,8 +2084,34 @@ CantSee:
         else if (mod == Q_TAR)
             m->Update(cr->x,cr->y);
 
+MouseDispatch:
         if (ch == KY_CMD_ESCAPE)
             return false;
+        else if (ch == KY_MOUSE) {
+            /* A click on a visible map square moves the location cursor
+               there and re-enters this dispatch as ENTER, so every
+               validation the keyboard path runs (bounds, visibility,
+               perception, range) runs for the mouse too. */
+            int16 mmx = (mouseCX - Windows[WIN_MAP].Left) + XOff;
+            int16 mmy = (mouseCY - Windows[WIN_MAP].Top)  + YOff;
+            /* The range clamp matches the keyboard exactly: the arrow path
+               above refuses to STEP the cursor beyond range, so ENTER can
+               never fire from out there and does not re-check. A click
+               teleports the cursor, so it must check. */
+            if ((mod == Q_LOC || mod == Q_TAR)
+                && mouseCX >= Windows[WIN_MAP].Left
+                && mouseCX <= Windows[WIN_MAP].Right
+                && mouseCY >= Windows[WIN_MAP].Top
+                && mouseCY <= Windows[WIN_MAP].Bottom
+                && m->InBounds(mmx,mmy)
+                && ::dist(p->x,p->y,mmx,mmy) <= range) {
+                mod = Q_LOC;
+                tx = mmx;
+                ty = mmy;
+                ch = KY_CMD_ENTER;
+                goto MouseDispatch;
+            }
+        }
         else if (ch == KY_CMD_WIZMODE &&
             theGame->GetPlayer(0) &&
             theGame->GetPlayer(0)->WizardMode && cr) {

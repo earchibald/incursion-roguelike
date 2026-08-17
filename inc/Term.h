@@ -29,6 +29,12 @@
 #define KY_F11   224
 #define KY_F12   225
 #define KY_REDRAW 250
+/* A mouse click, delivered through the key channel by backends that have a
+   mouse (Wmac.cpp). The clicked cell is in Term::mouseCX/mouseCY. Keyboard
+   flows never produce it, and keyset tables never match it. The value sits
+   far above both the raw key codes and the KeyCmd enum, whose values run
+   through the 250s -- KY_REDRAW itself equals KY_CMD_DOWN, see inc-upw. */
+#define KY_MOUSE  380
 
 
 #define KY_A     'a'
@@ -291,6 +297,9 @@ protected:
     LocationInfo *gr;
     int16 XOff,YOff;
     Item* Selected;
+    /* The absolute cell of the last mouse click, valid while handling a
+       KY_MOUSE returned from GetCharCmd. */
+    int16 mouseCX, mouseCY;
     uint8 OffscreenX[64], OffscreenY[64], OffscreenC;
 
     HyperLink HL[512];

@@ -1149,6 +1149,22 @@ InvalidChar:
             if (c + vRows <= min(OptionCount-1,vStart+(vRows*Cols-1)))
                 c += vRows;
             break;   
+        case KY_MOUSE: {
+            /* Invert the option-layout formula above: a click on a drawn
+               option selects it through the ENTER path below, so recording
+               and every other consequence stay identical to the keyboard.
+               Clicks anywhere else are ignored. */
+            int16 mwx = mouseCX - Windows[MWin].Left;
+            int16 mwy = mouseCY - Windows[MWin].Top;
+            int16 mrow = mwy - DY;
+            int16 mcol = (szCol > 0) ? (mwx / szCol) : 0;
+            int32 mi = vStart + mcol * vRows + mrow;
+            if (mwx < 0 || mrow < 0 || mrow >= vRows || mcol < 0 || mcol >= Cols
+                || mi >= min((int32)OptionCount, (int32)(vStart + vRows * Cols)))
+                goto InvalidChar;
+            c = (int16)mi;
+            }
+            /* FALLTHROUGH into the keyboard accept */
         case KY_ENTER:
             Restore();
             OptionCount=0;
@@ -1156,7 +1172,7 @@ InvalidChar:
                 strncpy(RInf.Rsp[RInf.nRsp].Question,title,31);
                 RInf.Rsp[RInf.nRsp].Answer = Option[c].Val;
                 RInf.nRsp++;
-            }             
+            }
             return Option[c].Val;
         case KY_ESC:
             if (fl & MENU_ESC) {
@@ -1441,6 +1457,20 @@ InvalidChar:
             if (c + vRows <= min(OptionCount-1,vStart+(vRows*Cols-1)))
                 c += vRows;
             break;   
+        case KY_MOUSE: {
+            /* Same inversion as LMenu's: a click on a drawn option toggles
+               its mark through the SPACE path below. */
+            int16 mwx = mouseCX - Windows[MWin].Left;
+            int16 mwy = mouseCY - Windows[MWin].Top;
+            int16 mrow = mwy - DY;
+            int16 mcol = (szCol > 0) ? (mwx / szCol) : 0;
+            int32 mi = vStart + mcol * vRows + mrow;
+            if (mwx < 0 || mrow < 0 || mrow >= vRows || mcol < 0 || mcol >= Cols
+                || mi >= min((int32)OptionCount, (int32)(vStart + vRows * Cols)))
+                goto InvalidChar;
+            c = (int16)mi;
+            }
+            /* FALLTHROUGH into the keyboard toggle */
         case KY_SPACE:
             Option[c].isMarked = !Option[c].isMarked;
             break;

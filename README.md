@@ -111,6 +111,11 @@ vector-font text at any size, mouse support, a real bundle. See the native-app
 section of [`docs/PORT-STATUS.md`](docs/PORT-STATUS.md) for what is proven and
 what remains before it becomes the shipped artifact.
 
+It also carries a help window (⌘?) that the other builds do not: the game's own
+manual and generated reference, exported from the engine at build time, beside
+the player guides from the Incursion Wiki under CC BY-SA 3.0. See
+[`docs/HELP-SYSTEM.md`](docs/HELP-SYSTEM.md).
+
 To produce a release image the way one is actually shipped:
 
 ```

@@ -233,6 +233,23 @@ appears in the game's help.)
    http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
    email: m-mat @ math.sci.hiroshima-u.ac.jp (remove space)
 
+## Player guides in the help window — CC BY-SA 3.0
+
+The Help window's "Getting Started" pages are copied from the Incursion Wiki
+(http://incursion.wikidot.com/), whose content is licensed under the Creative
+Commons Attribution-ShareAlike 3.0 Unported licence:
+
+    https://creativecommons.org/licenses/by-sa/3.0/
+
+Each page keeps that licence, names its own source page, its authors as
+"Incursion Wiki contributors", the date it was retrieved and the only change
+made to it -- the conversion from the site's HTML to Markdown. The pages are
+separate documents displayed by this application, not part of its code, and
+they may be redistributed under CC BY-SA 3.0 like any other copy. The
+vendored files and the tool that produced them are
+`macapp/Resources/Help/wiki/` and `tools/fetch_wiki_help.py` in the source
+repository.
+
 ## Other acknowledgements
 
 Incursion was created using the ACCENT Compiler-Compiler system and

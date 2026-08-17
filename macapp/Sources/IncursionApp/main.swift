@@ -53,6 +53,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         EngineHost.shared.start(directory: dir,
                                 gridW: Int32(gridW), gridH: Int32(gridH))
+
+        // A seam for looking at the help window without driving the menu by
+        // hand: INCURSION_OPEN_HELP=<topic|1> opens it at launch. It changes
+        // nothing for a player, and it is how the window's appearance is
+        // checked (tools/check_help.sh).
+        let env = ProcessInfo.processInfo.environment
+        if let want = env["INCURSION_OPEN_HELP"], !want.isEmpty {
+            HelpWindowController.shared.show(topic: want == "1" ? nil : want,
+                                             query: env["INCURSION_HELP_QUERY"])
+        }
     }
 
     // Closing the window is a request to save and quit; the engine answers
@@ -80,6 +90,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc func sendInventory(_ sender: Any?) { EngineHost.shared.pushKey(Int32(UInt8(ascii: "i")), mods: 0) }
     @objc func sendMessages(_ sender: Any?) { EngineHost.shared.pushKey(Int32(UInt8(ascii: "v")), mods: 0) }
     @objc func sendHelp(_ sender: Any?) { EngineHost.shared.pushKey(Int32(UInt8(ascii: "?")), mods: 0) }
+
+    /// The app's own help window. Separate from the in-game help on purpose:
+    /// this one does not pause the game, can sit beside it, and carries the
+    /// player guides the game itself has none of.
+    @objc func showHelpWindow(_ sender: Any?) {
+        HelpWindowController.shared.show()
+    }
+
+    @objc func showHelpTopic(_ sender: Any?) {
+        HelpWindowController.shared.show(
+            topic: (sender as? NSMenuItem)?.representedObject as? String)
+    }
 
     @objc func showLicenses(_ sender: Any?) {
         let bundled = Bundle.main.url(forResource: "LICENSES", withExtension: "md")
@@ -181,7 +203,7 @@ gameMenu.addItem(withTitle: "Inventory",
 gameMenu.addItem(withTitle: "Message History",
                  action: #selector(AppDelegate.sendMessages(_:)), keyEquivalent: "")
 gameMenu.addItem(withTitle: "Game Help",
-                 action: #selector(AppDelegate.sendHelp(_:)), keyEquivalent: "?")
+                 action: #selector(AppDelegate.sendHelp(_:)), keyEquivalent: "")
 gameItem.submenu = gameMenu
 
 let viewItem = NSMenuItem()
@@ -220,6 +242,30 @@ let softItem = viewMenu.addItem(withTitle: "Soft Palette",
                  action: #selector(AppDelegate.togglePalette(_:)), keyEquivalent: "")
 softItem.state = UserDefaults.standard.bool(forKey: "softPalette") ? .on : .off
 viewItem.submenu = viewMenu
+
+// The Help menu. macOS puts a search field at the top of whatever menu is
+// named "Help", which searches menu items -- harmless, and the standard
+// place a Mac user looks.
+let helpItem = NSMenuItem()
+mainMenu.addItem(helpItem)
+let helpMenu = NSMenu(title: "Help")
+helpMenu.addItem(withTitle: "Incursion Help",
+                 action: #selector(AppDelegate.showHelpWindow(_:)), keyEquivalent: "?")
+helpMenu.addItem(.separator())
+for (title, topic) in [("Getting Started", "intro"),
+                       ("Command Listing", "commands"),
+                       ("Character Generation", "chargen"),
+                       ("Combat", "combat"),
+                       ("Magic and Spellcasting", "magic")] {
+    let item = helpMenu.addItem(withTitle: title,
+        action: #selector(AppDelegate.showHelpTopic(_:)), keyEquivalent: "")
+    item.representedObject = topic
+}
+helpMenu.addItem(.separator())
+helpMenu.addItem(withTitle: "In-Game Help (?)",
+                 action: #selector(AppDelegate.sendHelp(_:)), keyEquivalent: "")
+helpItem.submenu = helpMenu
+app.helpMenu = helpMenu
 
 app.mainMenu = mainMenu
 

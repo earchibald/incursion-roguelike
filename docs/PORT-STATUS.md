@@ -1,6 +1,6 @@
 # Port status
 
-Last updated 2026-08-16. This is the running state of the macOS/POSIX port.
+Last updated 2026-08-17. This is the running state of the macOS/POSIX port.
 Read it before doing anything else.
 
 ## Native Mac app (2026-08-16, epic inc-9df.9)
@@ -39,6 +39,13 @@ What is proven, and how:
   waits on inc-9df.7).
 - Text is adjustable (View menu), palettes classic/soft, window resizes in
   cell increments with a live grid resize (floor 80x48).
+- **A help window of its own (2026-08-17).** The whole in-game manual and every
+  generated reference list, exported from the engine at build time so it always
+  matches the shipped ruleset, plus five player guides vendored from the
+  Incursion Wiki under CC BY-SA 3.0 with per-page attribution. Searchable,
+  cross-linked, in the game's palette. Proven by `tools/check_help.sh` (every
+  link lands, every guide carries its licence, the bundle holds both) and
+  `LIVE=yes` for the window itself. See [`HELP-SYSTEM.md`](HELP-SYSTEM.md).
 
 The whole surface was adversarially reviewed on 2026-08-16 (45 agents, five
 dimensions, two skeptics per finding): 20 confirmed defects, all fixed the

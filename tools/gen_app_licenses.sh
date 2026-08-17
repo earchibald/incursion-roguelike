@@ -9,6 +9,11 @@
 #   OGL v1.0a, full text   LICENSE 3 -- required by OGL section 10
 #   OGC designation        required by OGL section 8
 #   Mersenne Twister       its clause 2 requires this notice beside binaries
+#   CC BY-SA 3.0           the wiki guides in the help window are under it,
+#                          and it requires the licence to be named wherever
+#                          the work is conveyed. The per-page credit in the
+#                          help window is the primary notice; this is the
+#                          copy that travels with the bundle.
 #
 # What does NOT ship, deliberately: libtcod, SDL2, Breakpad, font PNGs --
 # the native app contains nothing of theirs, and LICENSE scopes each of those
@@ -98,6 +103,23 @@ DESIGNATION
     fi
     printf '%s\n' "$MT_TEXT"
     cat <<'FOOTER'
+
+## Player guides in the help window — CC BY-SA 3.0
+
+The Help window's "Getting Started" pages are copied from the Incursion Wiki
+(http://incursion.wikidot.com/), whose content is licensed under the Creative
+Commons Attribution-ShareAlike 3.0 Unported licence:
+
+    https://creativecommons.org/licenses/by-sa/3.0/
+
+Each page keeps that licence, names its own source page, its authors as
+"Incursion Wiki contributors", the date it was retrieved and the only change
+made to it -- the conversion from the site's HTML to Markdown. The pages are
+separate documents displayed by this application, not part of its code, and
+they may be redistributed under CC BY-SA 3.0 like any other copy. The
+vendored files and the tool that produced them are
+`macapp/Resources/Help/wiki/` and `tools/fetch_wiki_help.py` in the source
+repository.
 
 ## Other acknowledgements
 

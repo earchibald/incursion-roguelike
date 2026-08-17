@@ -49,6 +49,13 @@ COMPILER=yes BACKEND=libtcod OUT=incursion EXTRA_CXXFLAGS= ./build_macos.sh > /d
 "$ROOT/incursion" -compile main.irc > /dev/null
 echo "mod/Incursion.Mod"
 
+echo "--- help content (manual exported from the engine) ---"
+# The manual is generated, not written: half of it comes from the module that
+# was just compiled, so it must be exported AFTER that step and never checked
+# in. The wiki guides beside it ARE checked in -- they need the network, and a
+# build that reaches the internet is a build that fails on a train.
+"$ROOT/incursion" -exporthelp "$ROOT/macapp/Resources/Help/manual.json"
+
 echo "--- license document ---"
 tools/gen_app_licenses.sh "$ROOT/macapp/Resources/LICENSES.md"
 
@@ -83,6 +90,9 @@ cp "$BIN" "$APP/Contents/MacOS/Incursion"
 cp "$ROOT/macapp/Resources/Info.plist" "$APP/Contents/Info.plist"
 cp "$ROOT/mod/Incursion.Mod" "$APP/Contents/Resources/Incursion.Mod"
 cp "$ROOT/macapp/Resources/LICENSES.md" "$APP/Contents/Resources/LICENSES.md"
+# The help window reads this folder by name; keep the layout.
+rm -rf "$APP/Contents/Resources/Help"
+cp -R "$ROOT/macapp/Resources/Help" "$APP/Contents/Resources/Help"
 cp "$ROOT/build/Incursion.icns" "$APP/Contents/Resources/Incursion.icns"
 
 echo "--- signing ---"

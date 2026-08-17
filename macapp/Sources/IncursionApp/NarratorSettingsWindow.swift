@@ -156,7 +156,7 @@ struct NarratorSettingsView: View {
         }
     }
 
-    private func detectModels() {
+    @MainActor private func detectModels() {
         guard let c = client() else { testResult = "The endpoint URL is not valid."; return }
         busy = true
         Task {
@@ -171,7 +171,7 @@ struct NarratorSettingsView: View {
         }
     }
 
-    private func testConnection() {
+    @MainActor private func testConnection() {
         guard let c = client() else { testResult = "The endpoint URL is not valid."; return }
         busy = true
         Task {

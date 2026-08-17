@@ -41,13 +41,14 @@ final class SettingsTests: XCTestCase {
     }
 
     func testKeychainRoundTrip() {
-        KeychainStore.deleteToken()
-        XCTAssertNil(KeychainStore.loadToken())
-        KeychainStore.saveToken("sk-abc123")
-        XCTAssertEqual(KeychainStore.loadToken(), "sk-abc123")
-        KeychainStore.saveToken("sk-updated")
-        XCTAssertEqual(KeychainStore.loadToken(), "sk-updated")
-        KeychainStore.deleteToken()
-        XCTAssertNil(KeychainStore.loadToken())
+        defer { KeychainStore.deleteToken(account: "api-token-tests") }
+        KeychainStore.deleteToken(account: "api-token-tests")
+        XCTAssertNil(KeychainStore.loadToken(account: "api-token-tests"))
+        KeychainStore.saveToken("sk-abc123", account: "api-token-tests")
+        XCTAssertEqual(KeychainStore.loadToken(account: "api-token-tests"), "sk-abc123")
+        KeychainStore.saveToken("sk-updated", account: "api-token-tests")
+        XCTAssertEqual(KeychainStore.loadToken(account: "api-token-tests"), "sk-updated")
+        KeychainStore.deleteToken(account: "api-token-tests")
+        XCTAssertNil(KeychainStore.loadToken(account: "api-token-tests"))
     }
 }

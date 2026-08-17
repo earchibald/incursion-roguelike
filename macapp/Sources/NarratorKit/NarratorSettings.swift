@@ -9,23 +9,23 @@ import Combine
 
 public enum KeychainStore {
     static let service = "Incursion Narrator"
-    static let account = "api-token"
+    public static let account = "api-token"
 
-    static var query: [String: Any] {
+    static func query(account: String) -> [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,
          kSecAttrService as String: service,
          kSecAttrAccount as String: account]
     }
 
-    public static func saveToken(_ t: String) {
-        deleteToken()
-        var q = query
+    public static func saveToken(_ t: String, account: String = KeychainStore.account) {
+        deleteToken(account: account)
+        var q = query(account: account)
         q[kSecValueData as String] = Data(t.utf8)
         SecItemAdd(q as CFDictionary, nil)
     }
 
-    public static func loadToken() -> String? {
-        var q = query
+    public static func loadToken(account: String = KeychainStore.account) -> String? {
+        var q = query(account: account)
         q[kSecReturnData as String] = true
         q[kSecMatchLimit as String] = kSecMatchLimitOne
         var out: CFTypeRef?
@@ -34,8 +34,8 @@ public enum KeychainStore {
         return String(data: data, encoding: .utf8)
     }
 
-    public static func deleteToken() {
-        SecItemDelete(query as CFDictionary)
+    public static func deleteToken(account: String = KeychainStore.account) {
+        SecItemDelete(query(account: account) as CFDictionary)
     }
 }
 

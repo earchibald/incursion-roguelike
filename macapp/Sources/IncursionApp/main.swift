@@ -7,7 +7,8 @@
 
 import AppKit
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
+                         NSMenuDelegate {
     var window: NSWindow!
     var gridView: GridView!
     /// The grid last REQUESTED from the engine. Deduping against the last
@@ -54,6 +55,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         EngineHost.shared.start(directory: dir,
                                 gridW: Int32(gridW), gridH: Int32(gridH))
 
+        // Redraw the map whenever the working tileset changes, from the
+        // editor or the Tiles menu alike.
+        NotificationCenter.default.addObserver(
+            forName: TilesetStore.changed, object: nil, queue: .main
+        ) { [weak self] _ in self?.gridView.needsDisplay = true }
+
         // A seam for looking at the help window without driving the menu by
         // hand: INCURSION_OPEN_HELP=<topic|1> opens it at launch. It changes
         // nothing for a player, and it is how the window's appearance is
@@ -62,6 +69,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if let want = env["INCURSION_OPEN_HELP"], !want.isEmpty {
             HelpWindowController.shared.show(topic: want == "1" ? nil : want,
                                              query: env["INCURSION_HELP_QUERY"])
+        }
+        // The same seam for the tileset editor.
+        if env["INCURSION_OPEN_TILESET_EDITOR"] == "1" {
+            TilesetEditorWindowController.shared.show()
         }
     }
 
@@ -122,6 +133,75 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         gridView.setFontFamily(family)
         item.menu?.items.forEach { $0.state = ($0 == item) ? .on : .off }
         adjustFont(by: 0)  // reapply cell metrics to the window
+    }
+
+    // MARK: tiles
+
+    @objc func showTilesetEditor(_ sender: Any?) {
+        TilesetEditorWindowController.shared.show()
+    }
+
+    @objc func chooseBuiltinTileset(_ sender: Any?) {
+        guard let name = (sender as? NSMenuItem)?.representedObject as? String,
+              let set = Tileset.builtins.first(where: { $0.name == name })
+        else { return }
+        TilesetStore.shared.apply(set)
+    }
+
+    @objc func chooseSavedTileset(_ sender: Any?) {
+        guard let url = (sender as? NSMenuItem)?.representedObject as? URL
+        else { return }
+        do {
+            try TilesetStore.shared.load(from: url)
+        } catch {
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = "Could not load \(url.lastPathComponent)"
+            alert.informativeText = error.localizedDescription
+            alert.runModal()
+        }
+    }
+
+    @objc func restoreDefaultTiles(_ sender: Any?) {
+        TilesetStore.shared.restoreDefaults()
+    }
+
+    /// The Tiles submenu is rebuilt each time it opens: the saved sets on
+    /// disk change under the app, and the checkmark tracks the working set.
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        guard menu.title == "Tiles" else { return }
+        menu.removeAllItems()
+        let store = TilesetStore.shared
+        for set in Tileset.builtins {
+            let title = set.name == "Classic" ? "Classic (Default)" : set.name
+            let item = menu.addItem(withTitle: title,
+                action: #selector(AppDelegate.chooseBuiltinTileset(_:)),
+                keyEquivalent: "")
+            item.representedObject = set.name
+            item.state = (store.active == set) ? .on : .off
+        }
+        let saved = store.savedSetURLs()
+        if !saved.isEmpty {
+            menu.addItem(.separator())
+            for url in saved {
+                let name = url.deletingPathExtension().lastPathComponent
+                let item = menu.addItem(withTitle: name,
+                    action: #selector(AppDelegate.chooseSavedTileset(_:)),
+                    keyEquivalent: "")
+                item.representedObject = url
+                if let data = try? Data(contentsOf: url),
+                   let set = try? Tileset(jsonData: data) {
+                    item.state = (store.active == set) ? .on : .off
+                }
+            }
+        }
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Restore Default Tiles",
+            action: #selector(AppDelegate.restoreDefaultTiles(_:)),
+            keyEquivalent: "")
+        menu.addItem(withTitle: "Edit Tiles…",
+            action: #selector(AppDelegate.showTilesetEditor(_:)),
+            keyEquivalent: "")
     }
 
     @objc func togglePalette(_ sender: Any?) {
@@ -241,6 +321,16 @@ viewMenu.addItem(.separator())
 let softItem = viewMenu.addItem(withTitle: "Soft Palette",
                  action: #selector(AppDelegate.togglePalette(_:)), keyEquivalent: "")
 softItem.state = UserDefaults.standard.bool(forKey: "softPalette") ? .on : .off
+
+// The Tiles submenu: built-in and saved tilesets plus the editor. Its
+// items are rebuilt on open (menuNeedsUpdate), because saved sets live on
+// disk and the checkmark follows the working set.
+viewMenu.addItem(.separator())
+let tilesItem = NSMenuItem(title: "Tiles", action: nil, keyEquivalent: "")
+let tilesMenu = NSMenu(title: "Tiles")
+tilesMenu.delegate = delegate
+tilesItem.submenu = tilesMenu
+viewMenu.addItem(tilesItem)
 viewItem.submenu = viewMenu
 
 // The Help menu. macOS puts a search field at the top of whatever menu is

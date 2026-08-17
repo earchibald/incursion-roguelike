@@ -119,7 +119,7 @@ final class GridView: NSView {
             for x in 0..<f.width {
                 let cell = f.cells[y * f.width + x]
                 let id = cell & 0xFFF
-                let c = GlyphMap.character(for: id)
+                let c = TilesetStore.shared.character(for: id)
                 if c == " " { continue }
                 let fg = Int((cell >> 12) & 0xF)
                 let s = String(c) as NSString

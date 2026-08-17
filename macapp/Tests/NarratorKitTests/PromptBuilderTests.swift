@@ -32,7 +32,17 @@ final class PromptBuilderTests: XCTestCase {
         b.compact(summary: "the story so far")
         let msgs = b.request(userTurn: "u3")
         XCTAssertEqual(msgs.count, 3)
+        XCTAssertEqual(msgs[1].role, "assistant")
         XCTAssertTrue(msgs[1].content.contains("the story so far"))
+    }
+
+    func testRecordAfterCompactKeepsAppending() {
+        var b = PromptBuilder(system: "sys")
+        b.record(user: "u1", assistant: "a1")
+        b.compact(summary: "recap")
+        b.record(user: "u2", assistant: "a2")
+        let msgs = b.request(userTurn: "u3")
+        XCTAssertEqual(msgs.map(\.role), ["system", "assistant", "user", "assistant", "user"])
     }
 
     func testDeterministicSerializerEscapes() {

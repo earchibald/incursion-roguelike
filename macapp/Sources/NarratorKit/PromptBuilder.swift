@@ -44,7 +44,7 @@ public struct PromptBuilder {
     /// turn. Call only at a depth boundary.
     public mutating func compact(summary: String) {
         journal = [
-            ChatMessage(role: "user", content: "The story so far: " + summary),
+            ChatMessage(role: "assistant", content: "The story so far: " + summary),
         ]
     }
 }

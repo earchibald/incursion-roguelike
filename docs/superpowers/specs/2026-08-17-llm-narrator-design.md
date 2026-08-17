@@ -7,7 +7,7 @@ Tier: Narrator (first of Narrator → Author → Director; see wishlist bead for
 ## Goal
 
 Add an optional LLM "gamemaster" voice to the native Mac app. It narrates
-milestones of a run in a side pane and answers rules/lore questions grounded
+milestones of a run in its own narrator window and answers rules/lore questions grounded
 in the game's own manual and wiki pages. It must feel additive, never
 overbearing, and never touch game mechanics. All configuration lives in a
 settings GUI — no config files.
@@ -16,7 +16,7 @@ settings GUI — no config files.
 
 - No engine-side content generation (that is the Author tier).
 - No mid-run intervention in game state (Director tier).
-- No narration into the engine's own message pane (side pane only, for now).
+- No narration into the engine's own message pane (the narrator window only, for now).
 - No Anthropic-specific API features; the client speaks the OpenAI
   chat-completions dialect only.
 
@@ -85,9 +85,9 @@ Owns cadence and restraint. Responsibilities:
   - global cooldown: no narration within N game turns of the previous one,
     measured off the `turn` field in the state sample; death bypasses it
   - dedupe: the same milestone type on the same dungeon level narrates once
-  - closed/muted pane ⇒ zero API calls
+  - closed/muted narrator window ⇒ zero API calls
 - Narration NEVER blocks input. Requests are fire-and-forget; text streams
-  into the pane whenever it arrives.
+  into the narrator window whenever it arrives.
 - Each streaming entry is tracked by a stable identity (`NarrationEntry.id`),
   not by array position, so two narrations in flight at once cannot
   overwrite or interleave into each other's text.
@@ -149,7 +149,7 @@ IncursionApp/NarratorWindow.swift`). It is opened from the Gamemaster menu
 Closing the window sets `paneOpen = false` synchronously on the main actor
 (`NSWindowDelegate.windowWillClose`), so a closed narrator window is fully
 idle — no milestone narration and no ask-the-GM call fires while it is
-closed, matching the "closed/muted pane ⇒ zero API calls" rule in §2.
+closed, matching the "closed/muted narrator window ⇒ zero API calls" rule in §2.
 
 ### 6. Settings GUI
 
@@ -170,7 +170,7 @@ everything else to `UserDefaults`. The user never touches a file.
 ### 7. Failure behavior
 
 - Endpoint unreachable or token rejected: one quiet status line in the
-  pane; the narrator sleeps; the game never notices. No modals, no
+  narrator window; the narrator sleeps; the game never notices. No modals, no
   repeated error spam.
 - Malformed model responses degrade to "no narration this time."
 - The API token is redacted from all logs and diagnostics.
@@ -180,7 +180,7 @@ everything else to `UserDefaults`. The user never touches a file.
 Milestone narration sends recent game text to whatever endpoint the user
 configured. The settings window states this plainly next to the Base URL
 field. Nothing is sent until an endpoint and token are entered and a
-narration trigger fires with the pane open.
+narration trigger fires with the narrator window open.
 
 ## Testing
 
@@ -188,7 +188,7 @@ narration trigger fires with the pane open.
   model-list JSON parsing; throttle rules (cooldown, dedupe, per-type
   enable); Keychain wrapper.
 - **Integration:** a local mock OpenAI server drives the closed loop:
-  milestone in → request shape asserted → canned stream out → pane state.
+  milestone in → request shape asserted → canned stream out → window state.
 - **Engine:** `FULL=yes tools/check_macterm.sh` re-run to prove the tap
   changed nothing rendered. The tap is additive and off when callbacks are
   null.

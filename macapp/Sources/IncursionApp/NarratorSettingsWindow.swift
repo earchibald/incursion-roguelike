@@ -19,10 +19,16 @@ struct NarratorSettingsView: View {
     @State private var draft = ""
 
     private func client() -> OpenAIClient? {
-        guard let url = URL(string: settings.baseURLString) else { return nil }
+        guard let url = URL(string: settings.baseURLString) else {
+            testResult = "The endpoint URL is not valid."
+            return nil
+        }
+        guard !settings.model.isEmpty else {
+            testResult = "Choose or enter a model first."
+            return nil
+        }
         return OpenAIClient(config: EndpointConfig(
-            baseURL: url, token: token,
-            model: settings.model.isEmpty ? "unset" : settings.model))
+            baseURL: url, token: token, model: settings.model))
     }
 
     var body: some View {
@@ -157,7 +163,7 @@ struct NarratorSettingsView: View {
     }
 
     @MainActor private func detectModels() {
-        guard let c = client() else { testResult = "The endpoint URL is not valid."; return }
+        guard let c = client() else { return }
         busy = true
         Task {
             defer { busy = false }
@@ -172,7 +178,7 @@ struct NarratorSettingsView: View {
     }
 
     @MainActor private func testConnection() {
-        guard let c = client() else { testResult = "The endpoint URL is not valid."; return }
+        guard let c = client() else { return }
         busy = true
         Task {
             defer { busy = false }

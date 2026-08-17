@@ -35,6 +35,15 @@ struct NarratorPaneView: View {
                                 Text(entry.text.isEmpty ? "…" : entry.text)
                                     .font(.system(.body, design: .serif))
                                     .textSelection(.enabled)
+                                if entry.isAnswer, !entry.citations.isEmpty {
+                                    HStack(spacing: 12) {
+                                        ForEach(entry.citations, id: \.id) { citation in
+                                            Button(citation.title) { openCitation(citation) }
+                                                .buttonStyle(.link)
+                                                .font(.caption)
+                                        }
+                                    }
+                                }
                             }
                             .id(entry.id)
                         }
@@ -74,6 +83,15 @@ struct NarratorPaneView: View {
             .padding(10)
         }
         .frame(minWidth: 300, minHeight: 380)
+    }
+
+    /// Citation ids come from the same index HelpWindowController reads:
+    /// "wiki:slug" for a wiki page, a bare topic id otherwise. show(topic:)
+    /// looks a bare id up in both topics and wiki pages, so only the
+    /// "wiki:" marker itself needs stripping.
+    private func openCitation(_ citation: Citation) {
+        let topic = citation.id.hasPrefix("wiki:") ? String(citation.id.dropFirst(5)) : citation.id
+        HelpWindowController.shared.show(topic: topic)
     }
 
     private func submit() {

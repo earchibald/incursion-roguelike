@@ -54,6 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         }
         EngineHost.shared.start(directory: dir,
                                 gridW: Int32(gridW), gridH: Int32(gridH))
+        Narrator.attach()
 
         // Redraw the map whenever the working tileset changes, from the
         // editor or the Tiles menu alike.
@@ -112,6 +113,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
     @objc func showHelpTopic(_ sender: Any?) {
         HelpWindowController.shared.show(
             topic: (sender as? NSMenuItem)?.representedObject as? String)
+    }
+
+    // MARK: gamemaster
+
+    @objc func showNarrator(_ sender: Any?) {
+        NarratorWindowController.shared.show()
+    }
+
+    @objc func showNarratorSettings(_ sender: Any?) {
+        NarratorSettingsWindowController.shared.show()
     }
 
     @objc func showLicenses(_ sender: Any?) {
@@ -332,6 +343,19 @@ tilesMenu.delegate = delegate
 tilesItem.submenu = tilesMenu
 viewMenu.addItem(tilesItem)
 viewItem.submenu = viewMenu
+
+// The Gamemaster menu: the narrator pane and its settings. Sits before Help
+// so Help stays the last menu, matching the standard Mac layout.
+let gmItem = NSMenuItem()
+mainMenu.addItem(gmItem)
+let gmMenu = NSMenu(title: "Gamemaster")
+let gmShowItem = gmMenu.addItem(withTitle: "Show Narrator",
+    action: #selector(AppDelegate.showNarrator(_:)), keyEquivalent: "N")
+gmShowItem.keyEquivalentModifierMask = [.command, .shift]
+let gmSettingsItem = gmMenu.addItem(withTitle: "Gamemaster Settings…",
+    action: #selector(AppDelegate.showNarratorSettings(_:)), keyEquivalent: ",")
+gmSettingsItem.keyEquivalentModifierMask = [.command, .shift]
+gmItem.submenu = gmMenu
 
 // The Help menu. macOS puts a search field at the top of whatever menu is
 // named "Help", which searches menu items -- harmless, and the standard

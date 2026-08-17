@@ -24,6 +24,11 @@ final class EngineHost {
     /// Called on the main thread when a new frame is available.
     var onFrame: (() -> Void)?
 
+    /// Narrator taps; called on the main thread. Strings are copied before
+    /// the hop because the C buffers die when the callback returns.
+    var onGameMessage: ((String) -> Void)?
+    var onPlayerState: ((Data) -> Void)?
+
     private var thread: Thread?
     private var dirC: UnsafeMutablePointer<CChar>?
 
@@ -44,6 +49,16 @@ final class EngineHost {
             DispatchQueue.main.async { EngineHost.shared.onFrame?() }
         }
         cfg.cb.engine_waiting = nil
+        cfg.cb.game_message = { _, cLine in
+            guard let cLine else { return }
+            let line = String(cString: cLine)
+            DispatchQueue.main.async { EngineHost.shared.onGameMessage?(line) }
+        }
+        cfg.cb.player_state = { _, cJson in
+            guard let cJson else { return }
+            let json = Data(String(cString: cJson).utf8)
+            DispatchQueue.main.async { EngineHost.shared.onPlayerState?(json) }
+        }
         cfg.cb.engine_finished = { _, _ in
             DispatchQueue.main.async {
                 EngineHost.shared.finished = true

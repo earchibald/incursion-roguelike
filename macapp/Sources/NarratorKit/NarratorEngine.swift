@@ -6,17 +6,32 @@
 import Foundation
 import Combine
 
+/// A reference cited in an ask-the-GM answer. Tappable in the app: opens
+/// the help window at that topic.
+public struct Citation: Equatable {
+    public let id: String
+    public let title: String
+
+    public init(id: String, title: String) {
+        self.id = id
+        self.title = title
+    }
+}
+
 public struct NarrationEntry: Identifiable, Equatable {
     public let id: UUID
     public let milestone: Milestone?
     public var text: String
     public let isAnswer: Bool
+    public var citations: [Citation]
 
-    public init(milestone: Milestone?, text: String, isAnswer: Bool = false) {
+    public init(milestone: Milestone?, text: String, isAnswer: Bool = false,
+                citations: [Citation] = []) {
         self.id = UUID()
         self.milestone = milestone
         self.text = text
         self.isAnswer = isAnswer
+        self.citations = citations
     }
 }
 
@@ -49,6 +64,13 @@ public final class NarratorEngine: ObservableObject {
     private var artifactFlag = false        // set by messages, consumed by state
     private let recentCap = 200
 
+    // Snapshot of the settings that shaped the builder's system prompt, so
+    // narrate() can tell a prompt/voice/style edit apart from "nothing
+    // changed" and rebuild only when it must.
+    private var promptEditionSnapshot = 0
+    private var voiceSnapshot: PromptKey = .voiceChronicler
+    private var customStyleSnapshot = ""
+
     public init(settings: NarratorSettings, grounding: GroundingSource?,
                 makeClient: @escaping (EndpointConfig) -> OpenAIClient
                     = { OpenAIClient(config: $0) },
@@ -69,7 +91,9 @@ public final class NarratorEngine: ObservableObject {
 
     public func ingestState(_ json: Data) {
         guard let s = try? PlayerState(json: json) else { return }
-        if lastState?.name != s.name {          // new run
+        // A new run either carries a new name, or a turn regression under
+        // the same name -- e.g. a fresh character reusing an old one's name.
+        if lastState?.name != s.name || (lastState.map { s.turn < $0.turn } ?? false) {
             throttle.reset()
             builder = nil
         }
@@ -114,6 +138,12 @@ public final class NarratorEngine: ObservableObject {
         return s
     }
 
+    private func snapshotPromptEdition() {
+        promptEditionSnapshot = settings.promptEdition
+        voiceSnapshot = settings.voice
+        customStyleSnapshot = settings.customStyle
+    }
+
     private func endpoint() -> EndpointConfig? {
         guard let url = URL(string: settings.baseURLString),
               !settings.model.isEmpty,
@@ -128,10 +158,18 @@ public final class NarratorEngine: ObservableObject {
         guard let cfg = endpoint() else { return }
         if builder == nil {
             builder = PromptBuilder(system: currentSystemPrompt(state: state))
+            snapshotPromptEdition()
+        } else if settings.promptEdition != promptEditionSnapshot
+                    || settings.voice != voiceSnapshot
+                    || settings.customStyle != customStyleSnapshot {
+            // A prompt/voice/style edit landed since the builder was made:
+            // apply it now, at the cost of one prefix-cache break, keeping
+            // the journal intact.
+            builder?.replaceSystem(currentSystemPrompt(state: state))
+            snapshotPromptEdition()
         }
         let userTurn = milestonePrompt(for: m, state: state)
         let messages = builder!.request(userTurn: userTurn)
-        promptTokens += messages.reduce(0) { $0 + $1.content.count } / 4
         let entry = NarrationEntry(milestone: m, text: "")
         entries.append(entry)
         let entryID = entry.id
@@ -152,6 +190,9 @@ public final class NarratorEngine: ObservableObject {
                     }
                 await MainActor.run { [weak self] in
                     guard let self else { return }
+                    // Counted only on success, so a failed request doesn't
+                    // inflate the session's token estimate.
+                    self.promptTokens += messages.reduce(0) { $0 + $1.content.count } / 4
                     self.completionTokens += full.count / 4
                     self.builder?.record(user: userTurn, assistant: full)
                     // Scalar overwrite by design: only the latest status
@@ -174,7 +215,9 @@ public final class NarratorEngine: ObservableObject {
 
     /// One deliberate cache break at a depth boundary when the journal is big.
     private func compactIfNeeded(m: Milestone, cfg: EndpointConfig) {
-        guard m == .enteredLevel,
+        // A pane closed (or muted) mid-stream shouldn't trigger one more call.
+        guard paneOpen, !muted,
+              m == .enteredLevel,
               let b = builder, b.journalTokenEstimate > 3000 else { return }
         let client = makeClient(cfg)
         let ask = settings.promptText(.summarize) + "\n\n" + b.journalTranscript
@@ -212,6 +255,13 @@ public final class NarratorEngine: ObservableObject {
                 let ids = Self.parseTopicIDs(raw)
                 let reference = g.topicText(ids: ids, includeWiki: includeWiki)
                 let titles = g.topicTitles(ids: ids)
+                // Only ids that actually resolved to a title become
+                // citations -- a dangling id from the model's pick is just
+                // dropped, not shown as a dead link.
+                let citations = ids.compactMap { id -> Citation? in
+                    guard let title = g.topicTitles(ids: [id]).first else { return nil }
+                    return Citation(id: id, title: title)
+                }
                 let pass2 = [
                     ChatMessage(role: "system", content:
                         (self?.settings.promptText(.askAnswer) ?? "")
@@ -228,7 +278,13 @@ public final class NarratorEngine: ObservableObject {
                             self.entries[idx].text += delta
                         }
                     }
-                await MainActor.run { self?.statusLine = nil }
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
+                    self.statusLine = nil
+                    if let idx = self.entries.firstIndex(where: { $0.id == entryID }) {
+                        self.entries[idx].citations = citations
+                    }
+                }
             } catch {
                 await MainActor.run { [weak self] in
                     guard let self else { return }

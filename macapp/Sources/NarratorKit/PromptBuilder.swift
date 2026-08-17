@@ -17,11 +17,18 @@ public struct ChatMessage: Equatable {
 }
 
 public struct PromptBuilder {
-    private let system: String
+    private var system: String
     private var journal: [ChatMessage] = []
 
     public init(system: String) {
         self.system = system
+    }
+
+    /// Swaps only the system text, keeping the journal intact. Used when a
+    /// prompt/voice/style edit must apply at the next narration -- one
+    /// deliberate cache break, not a fresh conversation.
+    public mutating func replaceSystem(_ newSystem: String) {
+        system = newSystem
     }
 
     /// Rough size gauge for deciding when to compact (4 chars ≈ 1 token).

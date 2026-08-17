@@ -75,8 +75,8 @@ public final class OpenAIClient {
         guard http.statusCode == 200 else { throw OpenAIError.http(http.statusCode) }
         var full = ""
         for try await line in bytes.lines {
-            guard line.hasPrefix("data: ") else { continue }
-            let payload = String(line.dropFirst(6))
+            guard line.hasPrefix("data:") else { continue }
+            let payload = String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)
             if payload == "[DONE]" { break }
             guard let d = payload.data(using: .utf8),
                   let chunk = try? JSONDecoder().decode(Chunk.self, from: d),

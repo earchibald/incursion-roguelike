@@ -21,6 +21,15 @@ final class ThrottleTests: XCTestCase {
         XCTAssertTrue(t.permit(.levelUp, state: state(depth: 2, turn: 151), config: all))
     }
 
+    func testCooldownBoundaryExactlyEqualBlocks() {
+        var t = Throttle()
+        XCTAssertTrue(t.permit(.enteredLevel, state: state(depth: 2, turn: 100), config: all))
+        // 150 - 100 = 50 ≤ 50, still within cooldown
+        XCTAssertFalse(t.permit(.levelUp, state: state(depth: 2, turn: 150), config: all))
+        // 151 - 100 = 51 > 50, cooldown expired
+        XCTAssertTrue(t.permit(.levelUp, state: state(depth: 2, turn: 151), config: all))
+    }
+
     func testDeathIgnoresCooldown() {
         var t = Throttle()
         XCTAssertTrue(t.permit(.enteredLevel, state: state(depth: 2, turn: 100), config: all))

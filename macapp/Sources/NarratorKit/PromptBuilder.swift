@@ -29,6 +29,12 @@ public struct PromptBuilder {
         journal.reduce(0) { $0 + $1.content.count } / 4
     }
 
+    /// The current run's journal only, as "role: content" lines — what a
+    /// compaction summary should cover, not the whole cross-run pane history.
+    public var journalTranscript: String {
+        journal.map { "\($0.role): \($0.content)" }.joined(separator: "\n")
+    }
+
     public func request(userTurn: String) -> [ChatMessage] {
         [ChatMessage(role: "system", content: system)]
             + journal

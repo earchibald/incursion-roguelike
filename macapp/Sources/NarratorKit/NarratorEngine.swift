@@ -39,6 +39,7 @@ public final class NarratorEngine: ObservableObject {
     private let settings: NarratorSettings
     private let grounding: GroundingSource?
     private let makeClient: (EndpointConfig) -> OpenAIClient
+    private let tokenProvider: () -> String?
 
     private var detector = MilestoneDetector()
     private var throttle = Throttle()
@@ -50,10 +51,12 @@ public final class NarratorEngine: ObservableObject {
 
     public init(settings: NarratorSettings, grounding: GroundingSource?,
                 makeClient: @escaping (EndpointConfig) -> OpenAIClient
-                    = { OpenAIClient(config: $0) }) {
+                    = { OpenAIClient(config: $0) },
+                tokenProvider: @escaping () -> String? = { KeychainStore.loadToken() }) {
         self.settings = settings
         self.grounding = grounding
         self.makeClient = makeClient
+        self.tokenProvider = tokenProvider
     }
 
     // MARK: bridge input
@@ -114,7 +117,7 @@ public final class NarratorEngine: ObservableObject {
     private func endpoint() -> EndpointConfig? {
         guard let url = URL(string: settings.baseURLString),
               !settings.model.isEmpty,
-              let token = KeychainStore.loadToken() else {
+              let token = tokenProvider() else {
             statusLine = "The narrator is not configured yet (see Gamemaster settings)."
             return nil
         }
@@ -129,9 +132,9 @@ public final class NarratorEngine: ObservableObject {
         let userTurn = milestonePrompt(for: m, state: state)
         let messages = builder!.request(userTurn: userTurn)
         promptTokens += messages.reduce(0) { $0 + $1.content.count } / 4
-        var entry = NarrationEntry(milestone: m, text: "")
+        let entry = NarrationEntry(milestone: m, text: "")
         entries.append(entry)
-        let idx = entries.count - 1
+        let entryID = entry.id
         let client = makeClient(cfg)
         let temperature = settings.temperature
         let maxTokens = settings.maxTokens
@@ -141,7 +144,9 @@ public final class NarratorEngine: ObservableObject {
                     messages: messages, temperature: temperature,
                     maxTokens: maxTokens) { delta in
                         Task { @MainActor [weak self] in
-                            guard let self, self.entries.indices.contains(idx) else { return }
+                            guard let self,
+                                  let idx = self.entries.firstIndex(where: { $0.id == entryID })
+                            else { return }
                             self.entries[idx].text += delta
                         }
                     }
@@ -149,19 +154,21 @@ public final class NarratorEngine: ObservableObject {
                     guard let self else { return }
                     self.completionTokens += full.count / 4
                     self.builder?.record(user: userTurn, assistant: full)
+                    // Scalar overwrite by design: only the latest status
+                    // survives, so a burst of failures doesn't spam the pane.
                     self.statusLine = nil
                     self.compactIfNeeded(m: m, cfg: cfg)
                 }
             } catch {
                 await MainActor.run { [weak self] in
                     guard let self else { return }
-                    if self.entries.indices.contains(idx), self.entries[idx].text.isEmpty {
+                    if let idx = self.entries.firstIndex(where: { $0.id == entryID }),
+                       self.entries[idx].text.isEmpty {
                         self.entries.remove(at: idx)
                     }
                     self.statusLine = "The narrator could not reach the endpoint. It will try again next time."
                 }
             }
-            _ = entry // silence unused-variable pedantry across compilers
         }
     }
 
@@ -170,8 +177,7 @@ public final class NarratorEngine: ObservableObject {
         guard m == .enteredLevel,
               let b = builder, b.journalTokenEstimate > 3000 else { return }
         let client = makeClient(cfg)
-        let ask = settings.promptText(.summarize) + "\n\n"
-            + entries.filter { !$0.isAnswer }.map(\.text).joined(separator: "\n---\n")
+        let ask = settings.promptText(.summarize) + "\n\n" + b.journalTranscript
         Task { [weak self] in
             guard let summary = try? await client.streamChat(
                 messages: [ChatMessage(role: "user", content: ask)],
@@ -183,12 +189,13 @@ public final class NarratorEngine: ObservableObject {
     // MARK: ask-the-GM
 
     public func ask(_ question: String) {
-        guard settings.askEnabled, let cfg = endpoint(), let g = grounding else { return }
+        guard paneOpen, !muted,
+              settings.askEnabled, let cfg = endpoint(), let g = grounding else { return }
         entries.append(NarrationEntry(milestone: nil,
                                       text: "Q: " + question, isAnswer: true))
-        var answer = NarrationEntry(milestone: nil, text: "", isAnswer: true)
+        let answer = NarrationEntry(milestone: nil, text: "", isAnswer: true)
         entries.append(answer)
-        let idx = entries.count - 1
+        let entryID = answer.id
         let includeWiki = settings.includeWiki
         let pass1 = [
             ChatMessage(role: "system",
@@ -215,7 +222,9 @@ public final class NarratorEngine: ObservableObject {
                 _ = try await client.streamChat(messages: pass2,
                     temperature: temperature, maxTokens: 600) { delta in
                         Task { @MainActor [weak self] in
-                            guard let self, self.entries.indices.contains(idx) else { return }
+                            guard let self,
+                                  let idx = self.entries.firstIndex(where: { $0.id == entryID })
+                            else { return }
                             self.entries[idx].text += delta
                         }
                     }
@@ -223,12 +232,13 @@ public final class NarratorEngine: ObservableObject {
             } catch {
                 await MainActor.run { [weak self] in
                     guard let self else { return }
-                    if self.entries.indices.contains(idx), self.entries[idx].text.isEmpty {
-                        self.entries[idx].text = "The gamemaster could not answer (endpoint unreachable)."
+                    if let idx = self.entries.firstIndex(where: { $0.id == entryID }),
+                       self.entries[idx].text.isEmpty {
+                        self.entries.remove(at: idx)
                     }
+                    self.statusLine = "The narrator could not reach the endpoint. It will try again next time."
                 }
             }
-            _ = answer
         }
     }
 

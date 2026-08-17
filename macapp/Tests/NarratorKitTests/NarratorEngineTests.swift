@@ -13,7 +13,7 @@ final class NarratorEngineTests: XCTestCase {
                                     makeClient: { cfg in
             clientCalls?.fulfill()
             return OpenAIClient(config: cfg)
-        })
+        }, tokenProvider: { "sk-test" })
         engine.paneOpen = paneOpen
         return engine
     }
@@ -28,6 +28,14 @@ final class NarratorEngineTests: XCTestCase {
         let e = makeEngine(paneOpen: false, clientCalls: exp)
         e.ingestState(stateJSON(depth: 1, turn: 1))
         e.ingestState(stateJSON(depth: 2, turn: 2))
+        wait(for: [exp], timeout: 0.2)
+    }
+
+    func testClosedPaneAskMakesNoClient() {
+        let exp = expectation(description: "no client")
+        exp.isInverted = true
+        let e = makeEngine(paneOpen: false, clientCalls: exp)
+        e.ask("What is a kobold?")
         wait(for: [exp], timeout: 0.2)
     }
 

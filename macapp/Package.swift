@@ -27,9 +27,10 @@ let package = Package(
     platforms: [.macOS(.v14)],
     targets: [
         .target(name: "CIncursion"),
+        .target(name: "NarratorKit"),
         .executableTarget(
             name: "IncursionApp",
-            dependencies: ["CIncursion"],
+            dependencies: ["CIncursion", "NarratorKit"],
             linkerSettings: [
                 .unsafeFlags(["-L../build"]),
                 .linkedLibrary(engineLib),
@@ -37,5 +38,6 @@ let package = Package(
                 .linkedLibrary("z"),
             ]
         ),
+        .testTarget(name: "NarratorKitTests", dependencies: ["NarratorKit"]),
     ]
 )

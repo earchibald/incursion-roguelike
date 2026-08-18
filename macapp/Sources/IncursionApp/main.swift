@@ -24,16 +24,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
             gridView.setPalette(.soft)
         }
         let cell = gridView.cellSize
+        let inset = gridView.contentInset * 2
 
         // First window: as many cells as comfortably fit, floor 80x48.
         let visible = NSScreen.main?.visibleFrame
             ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let fitW = Int((visible.width * 0.9) / cell.width)
-        let fitH = Int((visible.height * 0.9) / cell.height)
+        let fitW = Int((visible.width * 0.9 - inset) / cell.width)
+        let fitH = Int((visible.height * 0.9 - inset) / cell.height)
         let gridW = max(80, min(fitW, 132))
         let gridH = max(48, min(fitH, 60))
-        let content = NSSize(width: CGFloat(gridW) * cell.width,
-                             height: CGFloat(gridH) * cell.height)
+        let content = NSSize(width: CGFloat(gridW) * cell.width + inset,
+                             height: CGFloat(gridH) * cell.height + inset)
 
         window = NSWindow(
             contentRect: NSRect(origin: .zero, size: content),
@@ -43,8 +44,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         window.contentView = gridView
         window.delegate = self
         window.resizeIncrements = NSSize(width: cell.width, height: cell.height)
-        window.contentMinSize = NSSize(width: 80 * cell.width,
-                                       height: 48 * cell.height)
+        window.contentMinSize = NSSize(width: 80 * cell.width + inset,
+                                       height: 48 * cell.height + inset)
         window.center()
         window.makeKeyAndOrderFront(nil)
         window.makeFirstResponder(gridView)
@@ -228,9 +229,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         let size = max(9, min(32, gridView.font.pointSize + delta))
         gridView.setFont(size: size)
         let cell = gridView.cellSize
+        let inset = gridView.contentInset * 2
         window.resizeIncrements = NSSize(width: cell.width, height: cell.height)
-        window.contentMinSize = NSSize(width: 80 * cell.width,
-                                       height: 48 * cell.height)
+        window.contentMinSize = NSSize(width: 80 * cell.width + inset,
+                                       height: 48 * cell.height + inset)
         // The window keeps its frame; the grid re-derives from it, so
         // bigger text means fewer, larger cells and vice versa.
         pushGridForCurrentWindow()
@@ -252,8 +254,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
     private func pushGridForCurrentWindow() {
         let cell = gridView.cellSize
         let size = gridView.bounds.size
-        let w = max(80, Int(size.width / cell.width))
-        let h = max(48, Int(size.height / cell.height))
+        let inset = gridView.contentInset * 2
+        let w = max(80, Int((size.width - inset) / cell.width))
+        let h = max(48, Int((size.height - inset) / cell.height))
         let current = requestedGrid ?? gridView.gridSize
         if w != current.w || h != current.h {
             requestedGrid = (w, h)

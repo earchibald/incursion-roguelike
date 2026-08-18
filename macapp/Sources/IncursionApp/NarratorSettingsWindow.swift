@@ -16,7 +16,6 @@ struct NarratorSettingsView: View {
     @State private var testResult: String?
     @State private var busy = false
     @State private var editingPrompt: PromptKey?
-    @State private var draft = ""
 
     private func client() -> OpenAIClient? {
         guard let url = URL(string: settings.baseURLString) else {
@@ -85,8 +84,7 @@ struct NarratorSettingsView: View {
                                 .background(.quaternary, in: Capsule())
                         }
                         Spacer()
-                        Button("Edit…") { draft = settings.promptText(key)
-                                          editingPrompt = key }
+                        Button("Edit…") { editingPrompt = key }
                         Button("Restore Default") { settings.restorePromptDefault(key) }
                             .disabled(!settings.isPromptModified(key))
                     }
@@ -133,22 +131,13 @@ struct NarratorSettingsView: View {
         .formStyle(.grouped)
         .frame(minWidth: 460, minHeight: 560)
         .sheet(item: $editingPrompt) { key in
-            VStack(alignment: .leading, spacing: 10) {
-                Text(key.title).font(.headline)
-                TextEditor(text: $draft)
-                    .font(.system(.body, design: .monospaced))
-                    .frame(minWidth: 480, minHeight: 260)
-                HStack {
-                    Button("Restore Default") { draft = key.defaultText }
-                    Spacer()
-                    Button("Cancel") { editingPrompt = nil }
-                    Button("Save") {
-                        settings.setPromptText(key, draft)
-                        editingPrompt = nil
-                    }.keyboardShortcut(.defaultAction)
-                }
+            // A child view that owns its text state: the parent's @State is
+            // not reliably applied to a sheet presented in the same update,
+            // which left the editor empty (bead inc-fun).
+            PromptEditorSheet(key: key,
+                              initialText: settings.promptText(key)) { text in
+                settings.setPromptText(key, text)
             }
-            .padding(16)
         }
     }
 
@@ -196,6 +185,40 @@ struct NarratorSettingsView: View {
 
 extension PromptKey: Identifiable {
     public var id: String { rawValue }
+}
+
+/// The prompt editor. It owns the draft text, seeded from the current prompt
+/// at init, so the sheet never presents empty.
+private struct PromptEditorSheet: View {
+    let key: PromptKey
+    let onSave: (String) -> Void
+    @State private var draft: String
+    @Environment(\.dismiss) private var dismiss
+
+    init(key: PromptKey, initialText: String, onSave: @escaping (String) -> Void) {
+        self.key = key
+        self.onSave = onSave
+        _draft = State(initialValue: initialText)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(key.title).font(.headline)
+            TextEditor(text: $draft)
+                .font(.system(.body, design: .monospaced))
+                .frame(minWidth: 480, minHeight: 260)
+            HStack {
+                Button("Restore Default") { draft = key.defaultText }
+                Spacer()
+                Button("Cancel") { dismiss() }
+                Button("Save") {
+                    onSave(draft)
+                    dismiss()
+                }.keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(16)
+    }
 }
 
 final class NarratorSettingsWindowController: NSObject {

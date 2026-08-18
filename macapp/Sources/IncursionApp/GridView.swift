@@ -14,6 +14,11 @@ final class GridView: NSView {
     private(set) var font: NSFont
     private(set) var cellSize: CGSize = .zero
 
+    /// Margin between the window edge and the outermost cells. The window's
+    /// rounded corners clip anything drawn flush against the edge (bead
+    /// inc-d8s), so the grid is drawn inset and the margin shows background.
+    let contentInset: CGFloat = 6
+
     // KY_* codes, computed as inc/Term.h computes them (200 + Dir).
     private static let kyUp: Int32 = 200, kyDown: Int32 = 201
     private static let kyRight: Int32 = 202, kyLeft: Int32 = 203
@@ -94,6 +99,8 @@ final class GridView: NSView {
 
         guard let f = frame_ else { return }
         let cw = cellSize.width, ch = cellSize.height
+        NSGraphicsContext.current?.cgContext
+            .translateBy(x: contentInset, y: contentInset)
 
         // Backgrounds first, in runs of equal colour per row.
         for y in 0..<f.height {
@@ -221,8 +228,8 @@ final class GridView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         let p = convert(event.locationInWindow, from: nil)
-        let x = Int32(p.x / cellSize.width)
-        let y = Int32(p.y / cellSize.height)
+        let x = Int32(max(0, p.x - contentInset) / cellSize.width)
+        let y = Int32(max(0, p.y - contentInset) / cellSize.height)
         EngineHost.shared.pushMouseDown(cellX: x, cellY: y)
     }
 

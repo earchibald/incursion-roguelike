@@ -17,7 +17,7 @@
 Effect "Tutorial Guide" : EA_OVERRIDE
   {
     int16 tGoal, tMove, tStrike, tHurt, tLowHP,
-          tPickup, tWield, tRest, tDescend;
+          tPickup, tWield, tRest, tDescend, tKill;
 
     Flags: EF_PERSISTANT;
 
@@ -29,7 +29,9 @@ Effect "Tutorial Guide" : EA_OVERRIDE
       tGoal = 1;
       EActor->IPrint("<13>Guide:<7> Your goal lies below: descend the Goblin
         Caves and defeat the goblin king. Take your time -- there is no
-        clock. Explore this level fully before you go deeper.");
+        clock. First, circle this entry chamber: eight potions always lie
+        around its edge, five of healing and three of escape. Take them
+        all before you go deeper.");
       return NOTHING;
       };
 
@@ -48,8 +50,20 @@ Effect "Tutorial Guide" : EA_OVERRIDE
         return NOTHING;
       tStrike = 1;
       EActor->IPrint("<13>Guide:<7> You struck at a foe! Combat continues
-        as you keep walking into your enemy. Watch the messages here to
-        see how the fight is going.");
+        as you keep walking into your enemy. Before you fight something
+        new, press <9>[l]<7> to look at it -- monsters with special
+        attacks are marked, and fleeing beats dying.");
+      return NOTHING;
+      };
+
+    On Event META(POST(EV_DEATH)) {
+      if (tKill || !EVictim || EVictim->isPlayer())
+        return NOTHING;
+      tKill = 1;
+      EActor->IPrint("<13>Guide:<7> Your first kill! Kills earn experience;
+        at 1,000 XP you reach level 2, and the first level is the hardest
+        climb. Duck anything that looks too strong -- a skeletal warrior
+        on this floor is a death sentence, not a payday.");
       return NOTHING;
       };
 
@@ -96,7 +110,8 @@ Effect "Tutorial Guide" : EA_OVERRIDE
       tRest = 1;
       EActor->IPrint("<13>Guide:<7> Resting recovers hit points and mana,
         but takes hours and can be interrupted by wandering monsters.
-        Rest in cleared corners, not open halls.");
+        Rest in cleared corners, not open halls -- and remember the inn
+        above the entry stairs, where sleep is always safe.");
       return NOTHING;
       };
 
@@ -105,9 +120,11 @@ Effect "Tutorial Guide" : EA_OVERRIDE
         return NOTHING;
       tDescend = 1;
       EActor->IPrint("<13>Guide:<7> Down you go -- each level is deeper and
-        deadlier than the last. That is the whole of the basics: explore,
-        fight, take, rest, descend. From here on, the dungeon teaches.
-        Press <9>[?]<7> whenever you need the manual.");
+        deadlier than the last. One standing warning: skip rooms with a
+        glowing circle at their center. What waits inside is out of your
+        depth and worth nothing. That is the whole of the basics: explore,
+        fight, take, rest, descend. Press <9>[?]<7> whenever you need the
+        manual.");
       return NOTHING;
       };
   }

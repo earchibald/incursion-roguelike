@@ -108,6 +108,15 @@ extern int16 LastSkillCheckResult;
 
 extern Game* theGame;
 extern Registry* theRegistry;
+
+/* Tutorial mode. TutorialRequested asks StartMenu to launch the guided
+   tutorial game on its next pass (set from the splash menu, or by the
+   front end at startup). InTutorial is true from tutorial game setup
+   until that game ends; character creation uses it to preset every
+   choice. Neither is saved: a reloaded tutorial game continues through
+   the Tutorial Guide effect's own persistent state. */
+extern bool TutorialRequested;
+extern bool InTutorial;
 extern Registry MainRegistry, ResourceRegistry;
 
 extern rID Candidates[2048];

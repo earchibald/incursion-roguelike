@@ -57,6 +57,10 @@ Map* TheMainMap;
 extern bool QuestMode;
 Tile *MapLetterArray[127];
 
+/* See inc/Globals.h for the contract on these two. */
+bool TutorialRequested = false;
+bool InTutorial = false;
+
 void BuildSpellList();
 
 Game * theGame;
@@ -86,6 +90,27 @@ Game::Game() : Object(T_GAME) {
 
 
 extern hObj excessItems[30];
+extern bool isMetaEvent(int32 ev);
+
+/* Hook the Tutorial Guide effect's META() handlers onto the new player as
+   TRAP_EVENT stati, the same way Magic::Override (src/Effects.cpp) installs
+   an EA_OVERRIDE effect. The stati are permanent, so they and the effect's
+   per-player variables survive save and load together. */
+static void InstallTutorialGuide(Player *pp) {
+    rID eID; Annotation *a; int16 i;
+
+    eID = FIND("Tutorial Guide");
+    if (!eID) {
+        Error("The loaded module has no Tutorial Guide effect!");
+        return;
+    }
+    for (a = RES(eID)->FAnnot(); a; a = RES(eID)->NAnnot())
+        if (a->AnType == AN_EVENT)
+            for (i = 0; i != 5; i++)
+                if (a->u.ev[i].Event && isMetaEvent(a->u.ev[i].Event))
+                    pp->GainPermStati(TRAP_EVENT, NULL, SS_MISC,
+                        a->u.ev[i].Event - 10000, 0, eID);
+}
 
 void Game::NewGame(rID mID, bool reincarnate) {
     int16 x, y, i;
@@ -169,6 +194,24 @@ void Game::NewGame(rID mID, bool reincarnate) {
             oItem(excessItems[i])->PlaceAt(pp->m, pp->x, pp->y);
             excessItems[i] = 0;
         }
+
+    if (InTutorial) {
+        InstallTutorialGuide(pp);
+        T1->Box(XPrint(
+            "<13>Welcome to Incursion!<7>\n\n"
+            "__This is the guided tutorial. The game has created a character "
+            "for you -- a human warrior, sturdy and simple to play -- so you "
+            "can learn the game before facing its many choices yourself.\n\n"
+            "__The <9>@<7> on the map is you. Move with the arrow keys or the "
+            "number pad. To attack a monster, simply walk into it. As you "
+            "explore, your guide will offer advice in the message window at "
+            "the top of the screen.\n\n"
+            "__Two keys to remember before all others: <9>[?]<7> shows the "
+            "help menu, and <9>[Esc]<7> opens the game menu, from which you "
+            "can save and exit. Everything else will be introduced as you "
+            "play.\n\n"
+            "__Press any key to begin."));
+    }
 }
 
 /* Say, once per session, that the game reached actual play.
@@ -2162,6 +2205,13 @@ void Game::StartMenu() {
 Redraw:
     do {
         T1->SetMode(MO_SPLASH);
+        if (TutorialRequested) {
+            /* Set by the front end (IncEngineConfig.tutorial) before this
+               menu first draws; go straight into the tutorial game. */
+            TutorialRequested = false;
+            i = 10;
+            goto Dispatch;
+        }
         T1->Title();
         T1->LOption("Create a New Character",0);
         T1->LOption("Restore a Saved Game",1);
@@ -2172,10 +2222,15 @@ Redraw:
         T1->LOption("Read the Introduction",6);
         T1->LOption("General Help",2);
         T1->LOption("Quit Incursion Completely",7);
+        /* Appended after the historical entries so that their menu letters,
+           which keyscripts under tools/keys select by, do not shift. */
+        T1->LOption("Begin the Tutorial",10);
 #ifdef DEBUG
         T1->LOption("(Debugging Commands)",99);
 #endif
-        switch(i = (int16)T1->LMenu(MENU_2COLS|MENU_REDRAW,"-- Initial Choices -- ",WIN_CUSTOM)) {
+        i = (int16)T1->LMenu(MENU_2COLS|MENU_REDRAW,"-- Initial Choices -- ",WIN_CUSTOM);
+Dispatch:
+        switch(i) {
         case 99:
             T1->LOption("Monster Evaluation",2);
             T1->LOption("Check Module Consistency",1);
@@ -2282,6 +2337,23 @@ Redraw:
                 break;
             T1->OptionManager();
             Cleanup();
+            break;
+        case 10:
+            if (!LoadModules())
+                break;
+            if (!FIND("Tutorial Guide")) {
+                /* A module compiled before the tutorial existed. */
+                T1->Box("This copy's game data (mod/Incursion.Mod) predates "
+                    "the tutorial. Recompile or reinstall the module to "
+                    "play the guided tutorial.");
+                Cleanup();
+                break;
+            }
+            InTutorial = true;
+            NewGame(0,false);
+            Play();
+            Cleanup();
+            InTutorial = false;
             break;
         case 7:
             goto Quit;

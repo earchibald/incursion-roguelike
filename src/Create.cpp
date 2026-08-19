@@ -114,7 +114,17 @@ void Player::Create(bool reincarnate) {
         SkillRanks[i] = 0;
 
     MyTerm->SetMode(MO_PLAY);
-    if (!reincarnate) {
+    if (InTutorial) {
+        /* The guided tutorial makes every chargen choice itself. These
+           per-player option values suppress the gender and subrace prompts
+           below and grant the Beginner's Kit; they are not written back to
+           Options.Dat, so they last only for this character. */
+        Options[OPT_BEGINKIT]   = 1;
+        Options[OPT_DIFFICULTY] = DIFF_TRAINING;
+        Options[OPT_GENDER]     = 3; /* random */
+        Options[OPT_SUBRACES]   = 0;
+    }
+    if (!reincarnate && !InTutorial) {
         if (yn("Alter the character generation options?")) {
 RedoOptions:
             MyTerm->SetMode(MO_SPLASH);
@@ -179,6 +189,15 @@ RepeatRace:
     MyTerm->Clear();
     MyTerm->ShowTraits(); MyTerm->ShowStatus();
     MyTerm->SetWin(WIN_CREATION);
+
+    if (InTutorial) {
+        /* Humans are the vanilla race: no birth-event prompts, no
+           subraces to explain, a bonus feat and skill points. */
+        RaceID = FIND("human;race");
+        if (!RaceID)
+            Fatal("The tutorial needs the human race resource!");
+        goto SkipSubraces;
+    }
 
     i = 0;
     for (q=0;q!=MAX_MODULES;q++)
@@ -289,6 +308,14 @@ SkipSubraces:
     MyTerm->SetWin(WIN_CREATION);
 
 RepeatClass:
+    if (InTutorial) {
+        /* Warriors have no god, no spells and no supernatural systems to
+           learn -- the class the walkthrough is written around. */
+        ClassID[0] = FIND("Warrior");
+        if (!ClassID[0])
+            Fatal("The tutorial needs the Warrior class resource!");
+        goto ClassChosen;
+    }
     i = 0;
     for (q=0;q!=MAX_MODULES;q++)
         if (theGame->Modules[q]) {
@@ -334,7 +361,8 @@ RepeatClass:
     if (TCLASS(ClassID[0])->PEvent(EV_ISTARGET,this,ClassID[0]) == ABORT) {
         MyTerm->Message("You do not meet the requirements for that class.");
         goto RepeatClass;
-    } 
+    }
+ClassChosen:
     CalcValues(true);
     MyTerm->ShowTraits(); MyTerm->ShowStatus();
     MyTerm->SetWin(WIN_CREATION);
@@ -355,6 +383,14 @@ RepeatClass:
         GrantPerks(RInf.Perks,this);
 
     Level[0] = 0;
+
+    if (InTutorial) {
+        /* True Neutral: the one alignment with no conduct to break. */
+        for (i=0;i<9;i++)
+            if (!(AlignmentInfo[i].align & (AL_LAWFUL|AL_CHAOTIC|AL_GOOD|AL_EVIL)))
+                break;
+        goto AlignmentChosen;
+    }
 
     for (i=0;i<9;i++) {
         if (TCLASS(ClassID[0])->HasFlag(CF_LAWFUL) &&
@@ -427,6 +463,7 @@ RepeatClass:
         "characters are proscribed from doing. Press '?' to view the manual "
         "section on alignments for more information.",
         WIN_CREATION,"help::adventuring,AC");
+AlignmentChosen:
     GainPermStati(ALIGNMENT,this,SS_PERM,AlignmentInfo[i].align);
     if (AlignmentInfo[i].align & AL_LAWFUL)
         alignLC = -50;
@@ -444,7 +481,25 @@ RepeatClass:
     MyTerm->ShowTraits(); MyTerm->ShowStatus();
     MyTerm->SetWin(WIN_CREATION);
 
-    if (!reincarnate)
+    if (!reincarnate && InTutorial) {
+        /* A plain melee spread: all warrior class skills, so every rank
+           costs one point and caps at level + 3. Whatever the preset
+           over- or under-spends, marking all pools spent below keeps the
+           character legal, exactly as the reincarnation path does. */
+        static const int16 TutorialSkills[] =
+            { SK_ATHLETICS, SK_CLIMB, SK_HEAL, SK_SPOT, SK_INTUITION, 0 };
+        CalcSP();
+        for (i=0;TutorialSkills[i];i++)
+            SkillRanks[TutorialSkills[i]] =
+                (int8)min(4,MaxRanks(TutorialSkills[i]));
+        CalcSP();
+        SpentSP[0] = TotalSP[0];
+        SpentSP[1] = TotalSP[1];
+        SpentSP[2] = TotalSP[2];
+        SpentSP[3] = TotalSP[3];
+        SpentSP[4] = TotalSP[4];
+        SpentSP[5] = TotalSP[5];
+    } else if (!reincarnate)
         MyTerm->SkillManager(true);
     else {
         memcpy(SkillRanks,RInf.SkillRanks,sizeof(int8)*(SK_LASTSKILL));
@@ -612,6 +667,10 @@ SkipThisFocus:;
     // the Enneagram, don't serve a purpose. Let's replace this with an
     // alignment choice, which does matter (monsters have unholy weapons,
     // there are magic circles vs evil, etc.). 
+    if (InTutorial) {
+        Personality = 0; /* colour only; any value serves */
+        goto PersonalityChosen;
+    }
     for(i=0;PersonalityNames[i];i++)
         MyTerm->LOption(PersonalityNames[i],i);
     Personality = MyTerm->LMenu(MENU_2COLS,
@@ -620,6 +679,7 @@ SkipThisFocus:;
         "will strongly colour how NPCs relate to you, as well as affecting "
         "psionic combat, the Greater Soulblade feat and follower loyalty.",
         WIN_CREATION,"help::chargen,P");
+PersonalityChosen:
 
     /* ww: unlikely, but it could happen ... */
     if (isMType(MA_DEMON) || isMType(MA_LYCANTHROPE) || isMType(MA_DEVIL) || isMType(MA_UNDEAD))
@@ -1343,6 +1403,16 @@ void Player::RollAttributes() {
     if (MyTerm->GetMode() == MO_RECREATE) {
         for (i = 0; i != 7; i++)
             BAttr[i] = RInf.Attr[i];
+        return;
+    }
+
+    if (InTutorial) {
+        /* A sturdy fixed array: strong, tough, unremarkable elsewhere. */
+        static const int8 TutorialAttrs[7] =
+            { 16, 14, 16, 10, 12, 8, 12 }; /* STR DEX CON INT WIS CHA LUC */
+        for (i = 0; i != 7; i++)
+            Attr[i] = BAttr[i] = TutorialAttrs[i];
+        statMethod = 0;
         return;
     }
 
@@ -2501,8 +2571,30 @@ void Player::GainFeat(int16 feat, int32 param) {
 
 Restart:
     Win = MyTerm->GetMode() == MO_CREATE ? WIN_CREATION : WIN_MENUBOX;
-    //Win = WIN_SCREEN; 
+    //Win = WIN_SCREEN;
     OneFeat = false;
+
+    /* At tutorial creation only -- level-ups during tutorial play use the
+       real menus, which is the point of the walkthrough. */
+    if (InTutorial && MyTerm->GetMode() == MO_CREATE) {
+        if (feat < FT_FIRST) {
+            static const int16 TutorialFeats[] =
+                { FT_TOUGHNESS, FT_ALERTNESS, FT_IMPROVED_INITIATIVE, 0 };
+            for (i=0;TutorialFeats[i];i++)
+                if (!HasFeat(TutorialFeats[i]) && FeatPrereq(TutorialFeats[i])) {
+                    feat = TutorialFeats[i];
+                    break;
+                }
+            if (feat < FT_FIRST)
+                return; /* preset list exhausted; grant nothing extra */
+        }
+        /* The warrior's birth script asks which weapon to focus on. */
+        if (!param && (feat == FT_WEAPON_FOCUS || feat == FT_WEAPON_PROFICIENCY))
+            param = FIND("long sword");
+        /* The human race's SK_ANY skill slot asks which skill to adopt. */
+        if (!param && feat == FT_NATURAL_APTITUDE)
+            param = SK_LISTEN;
+    }
 
     if (feat >= FT_FIRST)
         goto SelectedFeat;

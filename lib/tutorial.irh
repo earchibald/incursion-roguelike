@@ -1,0 +1,113 @@
+/* TUTORIAL.IRH -- the guided-tutorial scenario.
+
+     The Tutorial Guide effect below is the scenario resource for the
+   guided tutorial: its resource variables hold the walkthrough's state
+   (saved with the game in the module data segment), and its META()
+   event handlers are the walkthrough's triggers.
+
+     The engine installs one TRAP_EVENT stati on the tutorial character
+   for every META() handler declared here -- see InstallTutorialGuide()
+   in src/Main.cpp, which mirrors Magic::Override. To add a new beat,
+   add a variable, add an On Event META(...) block, and nothing else;
+   the C++ side discovers the handler from the annotations.
+
+     Every handler returns NOTHING: the guide observes play, it must
+   never swallow an event from the engine's own handlers. */
+
+Effect "Tutorial Guide" : EA_OVERRIDE
+  {
+    int16 tGoal, tMove, tStrike, tHurt, tLowHP,
+          tPickup, tWield, tRest, tDescend;
+
+    Flags: EF_PERSISTANT;
+
+    /* Game-rounds tick (once per 60 game ticks). Used once, early, to
+       state the goal after the player has had a moment to look around. */
+    On Event META(EV_TURN) {
+      if (tGoal)
+        return NOTHING;
+      tGoal = 1;
+      EActor->IPrint("<13>Guide:<7> Your goal lies below: descend the Goblin
+        Caves and defeat the goblin king. Take your time -- there is no
+        clock. Explore this level fully before you go deeper.");
+      return NOTHING;
+      };
+
+    On Event META(POST(EV_MOVE)) {
+      if (tMove)
+        return NOTHING;
+      tMove = 1;
+      EActor->IPrint("<13>Guide:<7> Good -- that is how you move. The map
+        remembers everywhere you have been. Walls block you, doors open
+        as you walk into them, and walking into a monster attacks it.");
+      return NOTHING;
+      };
+
+    On Event META(POST(EV_STRIKE)) {
+      if (tStrike)
+        return NOTHING;
+      tStrike = 1;
+      EActor->IPrint("<13>Guide:<7> You struck at a foe! Combat continues
+        as you keep walking into your enemy. Watch the messages here to
+        see how the fight is going.");
+      return NOTHING;
+      };
+
+    On Event META(EVICTIM(POST(EV_DAMAGE))) {
+      if (!tHurt) {
+        tHurt = 1;
+        EVictim->IPrint("<13>Guide:<7> You took damage. Your hit points
+          show on the status line; if they reach zero, you fall. Retreat
+          is always a fair tactic.");
+        return NOTHING;
+        }
+      if (!tLowHP && (EVictim->cHP * 3 < EVictim->mHP)) {
+        tLowHP = 1;
+        EVictim->IPrint("<13>Guide:<7> <4>You are badly hurt!<7> Break away
+          from the fight, find a quiet corridor, and press <9>[Z]<7> to
+          rest until you recover.");
+        }
+      return NOTHING;
+      };
+
+    On Event META(POST(EV_PICKUP)) {
+      if (tPickup)
+        return NOTHING;
+      tPickup = 1;
+      EActor->IPrint("<13>Guide:<7> Taken. Press <9>[I]<7> to open your
+        inventory, where you can wield weapons, wear armour, and examine
+        anything you carry. Press <9>[G]<7> over an item to pick it up.");
+      return NOTHING;
+      };
+
+    On Event META(POST(EV_WIELD)) {
+      if (tWield)
+        return NOTHING;
+      tWield = 1;
+      EActor->IPrint("<13>Guide:<7> A weapon in hand changes everything --
+        your warrior fights best with the blade he is focused in. Compare
+        weapons in the inventory screen before choosing.");
+      return NOTHING;
+      };
+
+    On Event META(POST(EV_REST)) {
+      if (tRest)
+        return NOTHING;
+      tRest = 1;
+      EActor->IPrint("<13>Guide:<7> Resting recovers hit points and mana,
+        but takes hours and can be interrupted by wandering monsters.
+        Rest in cleared corners, not open halls.");
+      return NOTHING;
+      };
+
+    On Event META(POST(EV_DESCEND)) {
+      if (tDescend)
+        return NOTHING;
+      tDescend = 1;
+      EActor->IPrint("<13>Guide:<7> Down you go -- each level is deeper and
+        deadlier than the last. That is the whole of the basics: explore,
+        fight, take, rest, descend. From here on, the dungeon teaches.
+        Press <9>[?]<7> whenever you need the manual.");
+      return NOTHING;
+      };
+  }

@@ -53,8 +53,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         EngineHost.shared.onFrame = { [weak self] in
             self?.gridView.refresh()
         }
+        // INCURSION_START_TUTORIAL=1 skips the splash menu into the guided
+        // tutorial -- same launch-seam pattern as INCURSION_OPEN_HELP below.
+        let wantTutorial = ProcessInfo.processInfo
+            .environment["INCURSION_START_TUTORIAL"] == "1"
         EngineHost.shared.start(directory: dir,
-                                gridW: Int32(gridW), gridH: Int32(gridH))
+                                gridW: Int32(gridW), gridH: Int32(gridH),
+                                tutorial: wantTutorial)
         Narrator.attach()
 
         // Redraw the map whenever the working tileset changes, from the
@@ -100,6 +105,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
     /// Menu items send raw keys, and only keys that mean the same thing in
     /// both of the game's keysets (Standard and Roguelike) get a menu item.
     @objc func sendEscape(_ sender: Any?) { EngineHost.shared.pushKey(27, mods: 0) }
+
+    /// Starts the guided tutorial by selecting its entry on the engine's
+    /// splash menu. The entry's menu letter depends on the keyset option,
+    /// so read that from the same Options.Dat the engine reads (byte 202,
+    /// OPT_ROGUELIKE; the file is a flat int8[900] indexed by OPT_*).
+    /// Mid-game the splash menu does not exist, so ask the player to exit
+    /// to it first rather than doing anything destructive on their behalf.
+    @objc func startTutorial(_ sender: Any?) {
+        let splashMode = 1  // MO_SPLASH, inc/Term.h
+        guard EngineHost.shared.currentFrame()?.mode == splashMode else {
+            let alert = NSAlert()
+            alert.messageText = "Finish this game first"
+            alert.informativeText = "The tutorial starts from the opening "
+                + "menu. Save and exit your current game (Esc \u{2192} "
+                + "Save and Quit), then choose Start Tutorial again."
+            alert.runModal()
+            return
+        }
+        var roguelikeKeys = false
+        let optPath = AppPaths.resolveGameDirectory() + "/Options.Dat"
+        if let opts = FileManager.default.contents(atPath: optPath),
+           opts.count > 202 {
+            roguelikeKeys = opts[202] != 0
+        }
+        // "Begin the Tutorial" is the 9th splash entry: letter table
+        // "abcdefghi..." standard, "acdefgimo..." roguelike (TextTerm.cpp).
+        let letter: UInt8 = roguelikeKeys ? UInt8(ascii: "m")
+                                          : UInt8(ascii: "i")
+        EngineHost.shared.pushKey(Int32(letter), mods: 0)
+    }
     @objc func sendInventory(_ sender: Any?) { EngineHost.shared.pushKey(Int32(UInt8(ascii: "i")), mods: 0) }
     @objc func sendMessages(_ sender: Any?) { EngineHost.shared.pushKey(Int32(UInt8(ascii: "v")), mods: 0) }
     @objc func sendHelp(_ sender: Any?) { EngineHost.shared.pushKey(Int32(UInt8(ascii: "?")), mods: 0) }
@@ -291,6 +326,8 @@ appItem.submenu = appMenu
 let gameItem = NSMenuItem()
 mainMenu.addItem(gameItem)
 let gameMenu = NSMenu(title: "Game")
+gameMenu.addItem(withTitle: "Start Tutorial",
+                 action: #selector(AppDelegate.startTutorial(_:)), keyEquivalent: "")
 gameMenu.addItem(withTitle: "Game Menu (Esc)",
                  action: #selector(AppDelegate.sendEscape(_:)), keyEquivalent: "")
 gameMenu.addItem(.separator())

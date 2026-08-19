@@ -72,6 +72,8 @@ typedef struct IncEngineConfig {
                                   unquittable moment is dropped. Parity runs
                                   only; the app wants 0, where a quit drains
                                   dialogs with ESC until it can act.        */
+    int32_t tutorial;          /* 1 = skip the splash menu once and start
+                                  the guided tutorial game immediately.    */
     IncCallbacks cb;
 } IncEngineConfig;
 

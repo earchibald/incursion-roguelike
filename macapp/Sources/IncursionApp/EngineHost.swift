@@ -32,7 +32,8 @@ final class EngineHost {
     private var thread: Thread?
     private var dirC: UnsafeMutablePointer<CChar>?
 
-    func start(directory: String, gridW: Int32, gridH: Int32) {
+    func start(directory: String, gridW: Int32, gridH: Int32,
+               tutorial: Bool = false) {
         guard thread == nil else { return }
 
         // The config and its strings must outlive the engine, which runs to
@@ -44,6 +45,7 @@ final class EngineHost {
         cfg.sizeY = gridH
         cfg.no_sleep = 0
         cfg.strict_quit = 0
+        cfg.tutorial = tutorial ? 1 : 0
         cfg.cb.ctx = nil
         cfg.cb.frame_ready = { _ in
             DispatchQueue.main.async { EngineHost.shared.onFrame?() }

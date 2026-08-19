@@ -64,6 +64,7 @@ Slot 0;
 #include "alchemy.irh"
 #include "mundane.irh"
 #include "abilities.irh"
+#include "tutorial.irh"
 #endif
 
 

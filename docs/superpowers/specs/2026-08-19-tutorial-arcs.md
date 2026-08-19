@@ -12,7 +12,7 @@ arc leans on a wiki claim, the anchor column names it.
 | # | Arc | Preset character | Teaches | Wiki anchor |
 |---|-----|------------------|---------|-------------|
 | 1 | First Steps *(shipped)* | Human Warrior | move, attack, loot, inventory, rest, descend, XP, entry-chamber potions | Survival: "Early Game Tips", "Starting Potions", "Pace Yourself" |
-| 2 | Eyes Open | Human Rogue | look before fighting, stealth toggle, Search and traps, lockpicking as safe XP, identifying items, escape potions, safe rest at the inn | Survival: "Stealth is Your Friend", "Know your enemy"; FAQ: "How can I identify my stuff?", "How can I safely sleep?" |
+| 2 | Eyes Open | Halfling Rogue | look before fighting, stealth toggle, Search and traps, lockpicking as safe XP, identifying items, escape potions, safe sleep (hearthstones, the inn, watches) | Survival: "Stealth is Your Friend", "Know your enemy"; FAQ: "How can I identify my stuff?", "How can I safely sleep?" |
 | 3 | At Range | Elf Archery Ranger | ranged slots (M/O/R/A), quick-swap `-`, Shift-direction fire, ammo economy, kiting slow monsters, animal companion and watches | FAQ: "What race and class combinations are good?", "I keep dying to zombies and blobs" |
 | 4 | First Spells | Human Mage | spell menu, spell hotkeys 0-9, autobuff F5, mana economy, Concentration, rest renews spells, spellbooks | Survival: "User Interface Tips"; Arcane Spell Guide |
 | 5 | Faith and Favor | Human Priest | choosing a god, prayer, favor and sacrifice, transgressions ("uneasy"), service spells, curses and altars | FAQ: "What gods are good?", "Why do I sometimes feel guilty or uneasy?", "How do I get rid of a curse?" |
@@ -22,6 +22,19 @@ The order is deliberate. Arcs 1-3 teach with systems that cannot be
 misconfigured (no god, no spells). Arc 4 adds resource management, arc 5
 adds the first conduct system, arc 6 assumes the player can already
 survive and only narrates the strategic layer.
+
+Arc 2's halfling is chosen for sleep safety: halflings begin play with
+3d6 Hearthstones of Onanda (lib/races.irh:1602), one-use items that
+guarantee a safe rest. New players die in their sleep; arc 2 hands them
+the tool and a beat that teaches it, early in the ladder. The halfling
+birth script grants only a proficiency, so the preset path stays
+prompt-free.
+
+Every tutorial preset also writes the wiki's recommended beginner
+options into the character (Beginner's Kit ON, maximum hit points and
+mana, out-of-depth monsters OFF, plus transgression hints). The options
+array is a Player field, so the tutorial save keeps these settings for
+its whole life without touching Options.Dat or other characters.
 
 ## Mechanism (built, reused by every arc)
 
@@ -50,7 +63,7 @@ so nobody rediscovers them.
 
 | Arc | Beats with existing events | Gaps (need a new hook or a workaround) |
 |---|---|---|
-| 2 | `EV_PICKUP`, `EV_WALKON` (traps), `EV_ASCEND` (inn), `EV_DEATH` | hide toggle has no event (poll a stati from `META(EV_TURN)`); lock-pick success has no event (hook the XP gain or add a `Throw` in src/Inv.cpp); "first unidentified item" needs an inventory scan from `META(EV_TURN)` |
+| 2 | `EV_PICKUP`, `EV_WALKON` (traps), `EV_ASCEND` (inn), `EV_DEATH`, `EV_INVOKE` (crumbling a hearthstone) | hide toggle has no event (poll a stati from `META(EV_TURN)`); lock-pick success has no event (hook the XP gain or add a `Throw` in src/Inv.cpp); "first unidentified item" needs an inventory scan from `META(EV_TURN)` |
 | 3 | `EV_RATTACK`, `EV_STRIKE`, `EV_HIT`, `EV_MISS` | out-of-ammo moment (poll quiver from `META(EV_TURN)`); companion beats can hook `GODWATCH`-visible rest events |
 | 4 | `EV_CAST`, `EV_INVOKE`, `EV_MACRO` (F-keys) | "opened the spell menu" has no event (teach it from the welcome text instead); mana-low nudge polls from `META(EV_TURN)` |
 | 5 | `EV_PRAY`, `EV_SACRIFICE`, `EV_CONVERT`, `EV_INSIGHT` | transgression moment: watch the guilty/uneasy stati from `META(EV_TURN)` |

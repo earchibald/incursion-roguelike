@@ -117,12 +117,19 @@ void Player::Create(bool reincarnate) {
     if (InTutorial) {
         /* The guided tutorial makes every chargen choice itself. These
            per-player option values suppress the gender and subrace prompts
-           below and grant the Beginner's Kit; they are not written back to
-           Options.Dat, so they last only for this character. */
-        Options[OPT_BEGINKIT]   = 1;
-        Options[OPT_DIFFICULTY] = DIFF_TRAINING;
-        Options[OPT_GENDER]     = 3; /* random */
-        Options[OPT_SUBRACES]   = 0;
+           below and set the wiki's beginner-recommended settings: the
+           Beginner's Kit, maximum hit points and mana, and no out-of-depth
+           monsters. They serialize with the Player, so the tutorial save
+           keeps them; they are not written back to Options.Dat, so other
+           characters are untouched. */
+        Options[OPT_BEGINKIT]        = 1;
+        Options[OPT_DIFFICULTY]      = DIFF_TRAINING;
+        Options[OPT_MAX_HP]          = 2; /* full */
+        Options[OPT_MAX_MANA]        = 2; /* full */
+        Options[OPT_OOD_MONSTERS]    = 0;
+        Options[OPT_TRANSGRESS_HINTS]= 1; /* explain guilty/uneasy */
+        Options[OPT_GENDER]          = 3; /* random */
+        Options[OPT_SUBRACES]        = 0;
     }
     if (!reincarnate && !InTutorial) {
         if (yn("Alter the character generation options?")) {

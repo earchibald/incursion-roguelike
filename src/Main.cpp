@@ -198,19 +198,20 @@ void Game::NewGame(rID mID, bool reincarnate) {
     if (InTutorial) {
         InstallTutorialGuide(pp);
         T1->Box(XPrint(
-            "<13>Welcome to Incursion!<7>\n\n"
-            "__This is the guided tutorial. The game has created a character "
-            "for you -- a human warrior, sturdy and simple to play -- so you "
-            "can learn the game before facing its many choices yourself.\n\n"
-            "__The <9>@<7> on the map is you. Move with the arrow keys or the "
-            "number pad. To attack a monster, simply walk into it. As you "
-            "explore, your guide will offer advice in the message window at "
-            "the top of the screen.\n\n"
-            "__Two keys to remember before all others: <9>[?]<7> shows the "
-            "help menu, and <9>[Esc]<7> opens the game menu, from which you "
-            "can save and exit. Everything else will be introduced as you "
-            "play.\n\n"
-            "__Press any key to begin."));
+            "<13>You are not the first.<7>\n\n"
+            "__The one who watches you from beside the stairs wore a caravan "
+            "guard's colors once. He still stands like a man on duty.\n\n"
+            "__<13>Hadric:<7> Recruit. I guarded salt wagons out of Mohandi "
+            "for twenty years and died in this room with my shield still on "
+            "my back, so attend: the <9>@<7> on the map is you. Walk with "
+            "the arrow keys or the number pad. Walk into a goblin and you "
+            "have attacked it -- that is all the swordsmanship the first "
+            "day needs.\n\n"
+            "__Two signs before any other. <9>[?]<7> opens the manual; "
+            "every word in it was paid for in blood, most of it ours. "
+            "<9>[Esc]<7> opens the game menu, where a living soul can save "
+            "and walk away. The dead recommend it highly.\n\n"
+            "__Now move."));
     }
 }
 

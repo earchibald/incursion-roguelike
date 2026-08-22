@@ -12,7 +12,12 @@
    the C++ side discovers the handler from the annotations.
 
      Every handler returns NOTHING: the guide observes play, it must
-   never swallow an event from the engine's own handlers. */
+   never swallow an event from the engine's own handlers.
+
+     The narrator is Hadric, a dead caravan guard from the Entry
+   Chamber's mass grave. His voice, and the review cycle every line
+   of this text must pass, are specified in
+   docs/superpowers/specs/2026-08-22-tutorial-voice.md. */
 
 Effect "Tutorial Guide" : EA_OVERRIDE
   {
@@ -27,11 +32,12 @@ Effect "Tutorial Guide" : EA_OVERRIDE
       if (tGoal)
         return NOTHING;
       tGoal = 1;
-      EActor->IPrint("<13>Guide:<7> Your goal lies below: descend the Goblin
-        Caves and defeat the goblin king. Take your time -- there is no
-        clock. First, circle this entry chamber: eight potions always lie
-        around its edge, five of healing and three of escape. Take them
-        all before you go deeper.");
+      EActor->IPrint("<13>Hadric:<7> The king you want is ten floors down,
+        and he can wait; nothing in these caves hurries but the dying.
+        Circle this chamber first. Eight potions lie among my neighbors --
+        five of healing, three of dimension door, which is a soldier's
+        word for elsewhere. We carried them down and never carried them
+        up, so they are yours.");
       return NOTHING;
       };
 
@@ -39,9 +45,9 @@ Effect "Tutorial Guide" : EA_OVERRIDE
       if (tMove)
         return NOTHING;
       tMove = 1;
-      EActor->IPrint("<13>Guide:<7> Good -- that is how you move. The map
-        remembers everywhere you have been. Walls block you, doors open
-        as you walk into them, and walking into a monster attacks it.");
+      EActor->IPrint("<13>Hadric:<7> The caves go on farther than your
+        torch does. The map keeps everything you have seen -- trust it
+        over your memory. Mine failed me at the worst hour it could.");
       return NOTHING;
       };
 
@@ -49,10 +55,10 @@ Effect "Tutorial Guide" : EA_OVERRIDE
       if (tStrike)
         return NOTHING;
       tStrike = 1;
-      EActor->IPrint("<13>Guide:<7> You struck at a foe! Combat continues
-        as you keep walking into your enemy. Before you fight something
-        new, press <9>[l]<7> to look at it -- monsters with special
-        attacks are marked, and fleeing beats dying.");
+      EActor->IPrint("<13>Hadric:<7> Struck. Keep stepping into it until
+        one of you stops. And before you trade blows with a stranger,
+        press <9>[l]<7> and read it. The things that killed us had their
+        habits written plain, for anyone who looked.");
       return NOTHING;
       };
 
@@ -60,26 +66,28 @@ Effect "Tutorial Guide" : EA_OVERRIDE
       if (tKill || !EVictim || EVictim->isPlayer())
         return NOTHING;
       tKill = 1;
-      EActor->IPrint("<13>Guide:<7> Your first kill! Kills earn experience;
-        at 1,000 XP you reach level 2, and the first level is the hardest
-        climb. Duck anything that looks too strong -- a skeletal warrior
-        on this floor is a death sentence, not a payday.");
+      EActor->IPrint("<13>Hadric:<7> The first one I dropped, I stood over
+        too long; count it and move. Kills are the coin that buys levels
+        -- a thousand experience buys your second, and no floor is
+        stingier than this one. If a thing outmatches you -- a Skeletal
+        Warrior, say -- leave it standing. I didn't.");
       return NOTHING;
       };
 
     On Event META(EVICTIM(POST(EV_DAMAGE))) {
       if (!tHurt) {
         tHurt = 1;
-        EVictim->IPrint("<13>Guide:<7> You took damage. Your hit points
-          show on the status line; if they reach zero, you fall. Retreat
-          is always a fair tactic.");
+        EVictim->IPrint("<13>Hadric:<7> You're bleeding. Hit points, on
+          the status line; when they run out you lie down with the rest
+          of us. Put a corridor between you and the thing that did it.
+          The dead were braver.");
         return NOTHING;
         }
       if (!tLowHP && (EVictim->cHP * 3 < EVictim->mHP)) {
         tLowHP = 1;
-        EVictim->IPrint("<13>Guide:<7> <4>You are badly hurt!<7> Break away
-          from the fight, find a quiet corridor, and press <9>[Z]<7> to
-          rest until you recover.");
+        EVictim->IPrint("<13>Hadric:<7> <4>Enough.<7> Break off. Find a
+          corner the dead have already cleared and press <9>[Z]<7> to
+          sleep the blood back. Pride will not clot.");
         }
       return NOTHING;
       };
@@ -88,9 +96,10 @@ Effect "Tutorial Guide" : EA_OVERRIDE
       if (tPickup)
         return NOTHING;
       tPickup = 1;
-      EActor->IPrint("<13>Guide:<7> Taken. Press <9>[I]<7> to open your
-        inventory, where you can wield weapons, wear armour, and examine
-        anything you carry. Press <9>[G]<7> over an item to pick it up.");
+      EActor->IPrint("<13>Hadric:<7> Take everything; the owners have
+        stopped minding. <9>[I]<7> opens your pack -- wear what fits and
+        wield what bites; the rest stays in the pack until you can name
+        it. <9>[G]<7> takes whatever you stand over.");
       return NOTHING;
       };
 
@@ -98,9 +107,10 @@ Effect "Tutorial Guide" : EA_OVERRIDE
       if (tWield)
         return NOTHING;
       tWield = 1;
-      EActor->IPrint("<13>Guide:<7> A weapon in hand changes everything --
-        your warrior fights best with the blade he is focused in. Compare
-        weapons in the inventory screen before choosing.");
+      EActor->IPrint("<13>Hadric:<7> Steel forward, and wear what you
+        carry -- my shield rode my back for twenty years and my last
+        hour. You were drilled to the long sword; weigh anything
+        'better' in the pack screen, not mid-fight.");
       return NOTHING;
       };
 
@@ -108,10 +118,10 @@ Effect "Tutorial Guide" : EA_OVERRIDE
       if (tRest)
         return NOTHING;
       tRest = 1;
-      EActor->IPrint("<13>Guide:<7> Resting recovers hit points and mana,
-        but takes hours and can be interrupted by wandering monsters.
-        Rest in cleared corners, not open halls -- and remember the inn
-        above the entry stairs, where sleep is always safe.");
+      EActor->IPrint("<13>Hadric:<7> Sleep before you need it; I put it
+        off one corridor too many. Rest costs hours, and things walk
+        while you dream, so bed down behind cleared ground -- or climb
+        the entry stairs to the inn above, where nothing follows.");
       return NOTHING;
       };
 
@@ -119,12 +129,12 @@ Effect "Tutorial Guide" : EA_OVERRIDE
       if (tDescend)
         return NOTHING;
       tDescend = 1;
-      EActor->IPrint("<13>Guide:<7> Down you go -- each level is deeper and
-        deadlier than the last. One standing warning: skip rooms with a
-        glowing circle at their center. What waits inside is out of your
-        depth and worth nothing. That is the whole of the basics: explore,
-        fight, take, rest, descend. Press <9>[?]<7> whenever you need the
-        manual.");
+      EActor->IPrint("<13>Hadric:<7> The stairs, then. Past here I do not
+        go; I never learned what the second floor keeps, and I am
+        content. Every level down is meaner than the last. Walk wide of
+        rooms with a circle at their center -- what stands in those is
+        caged, mostly, and profitless either way. And recruit -- come
+        back up. One of us should.");
       return NOTHING;
       };
   }

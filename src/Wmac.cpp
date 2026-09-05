@@ -1142,7 +1142,7 @@ int incursion_engine_main(const IncEngineConfig *cfg) {
     MTpub.store(MT, std::memory_order_release);
 
     T1->Initialize();
-    TutorialRequested = cfg->tutorial != 0;
+    TutorialRequested = (int16)cfg->tutorial; /* arc number, 0 = off */
     theGame->StartMenu();
     T1->ShutDown();  /* notifies the UI and parks; not normally reached */
 

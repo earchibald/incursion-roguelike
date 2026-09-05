@@ -58,8 +58,8 @@ extern bool QuestMode;
 Tile *MapLetterArray[127];
 
 /* See inc/Globals.h for the contract on these two. */
-bool TutorialRequested = false;
-bool InTutorial = false;
+int16 TutorialRequested = 0;
+int16 TutorialArc = 0;
 
 void BuildSpellList();
 
@@ -92,16 +92,100 @@ Game::Game() : Object(T_GAME) {
 extern hObj excessItems[30];
 extern bool isMetaEvent(int32 ev);
 
-/* Hook the Tutorial Guide effect's META() handlers onto the new player as
-   TRAP_EVENT stati, the same way Magic::Override (src/Effects.cpp) installs
-   an EA_OVERRIDE effect. The stati are permanent, so they and the effect's
-   per-player variables survive save and load together. */
+/* One row per tutorial arc: the splash menu entry, the guide effect in
+   lib/tutorial.irh, and the welcome box that opens play. The narration,
+   its personas and the review cycle every line must pass are specified
+   in docs/superpowers/specs/2026-08-22-tutorial-voice.md; the beat
+   scripts live in 2026-08-22-tutorial-scripts.md. */
+struct TutorialArcInfo {
+    const char *option;   /* arc-selection menu entry */
+    const char *effect;   /* guide effect resource name */
+    const char *welcome;  /* XPrint box shown as play begins */
+};
+static const TutorialArcInfo TutorialArcs[TUTORIAL_LAST_ARC] = {
+  { "First Steps (human warrior)", "Tutorial Guide",
+    "<13>You are not the first.<7>\n\n"
+    "__The one who watches you from beside the stairs wore a caravan "
+    "guard's colors once. He still stands like a man on duty.\n\n"
+    "__<13>Hadric:<7> Recruit. I guarded salt wagons out of Mohandi "
+    "for twenty years and died in this room with my shield still on "
+    "my back, so attend: the <9>@<7> on the map is you. Walk with "
+    "the arrow keys or the number pad. Walk into a goblin and you "
+    "have attacked it -- that is all the swordsmanship the first "
+    "day needs.\n\n"
+    "__Two signs before any other. <9>[?]<7> opens the manual; "
+    "every word in it was paid for in blood, most of it ours. "
+    "<9>[Esc]<7> opens the game menu, where a living soul can save "
+    "and walk away. The dead recommend it highly.\n\n"
+    "__Now move." },
+  { "Eyes Open (halfling rogue)", "Tutorial Guide II",
+    "<13>Two thousand came down these stairs before you. Some of them "
+    "are still listening.<7>\n\n"
+    "__<13>Perrin:<7> Perrin Underbough, late of the Underboughs of "
+    "Greenhollow, later still of this floor. I slept in the wrong "
+    "corridor once. Once was the whole lesson.\n\n"
+    "__<13>Perrin:<7> Folk up top will tell you this business below is "
+    "fighting. It is not. It is the art of not being caught -- by "
+    "eyes, or by a lock you rattled instead of listened at, or worst "
+    "of all by your own sleep.\n\n"
+    "__<13>Perrin:<7> Your errand is the goblin king, down at the "
+    "bottom of these caves. Mine is to walk you across this first "
+    "floor with your pockets full and your blood inside you. We had "
+    "a saying: a door you listened at is a door that owes you.\n\n"
+    "__<13>Perrin:<7> Check those pockets, by the way. Halflings are "
+    "born carrying more than luck." },
+  { "At Range (elf archer)", "Tutorial Guide III",
+    "<13>One of the dead has been waiting a long time, and is good "
+    "at it.<7>\n\n"
+    "__<13>Sylvassi:<7> Sylvassi. I was owed three centuries and "
+    "spent them here instead.\n\n"
+    "__<13>Sylvassi:<7> You carry a bow. Then the ground between you "
+    "and a thing is yours, and you will keep it. Everything I have "
+    "to teach is a distance.\n\n"
+    "__<13>Sylvassi:<7> Twelve paces is a friend. I will speak when "
+    "there is something to say." },
+  { "First Spells (human mage)", "Tutorial Guide IV",
+    "<13>Among the corpses strewn about the entry stair, one sits "
+    "apart, propped against the wall with a book still open on its "
+    "knees.<7>\n\n"
+    "__<13>Maro Venn:<7> Maro Venn, mage -- late mage, in both "
+    "senses. I died on this floor with three -- no, two and a half "
+    "-- spells left unlearned in the book I was reading. Your craft "
+    "is the economy of mana, and I will teach it as nobody taught "
+    "me. Press <9>[m]<7> for your spell list: every spell you know, "
+    "its mana price, its odds of success. Learn the prices before "
+    "you spend." },
+  { "Faith and Favor (human priest)", "Tutorial Guide V",
+    "<13>By the entry stair a shade kneels among the dead as if in "
+    "vigil, hands folded over a chained holy symbol long since "
+    "rusted through.<7>\n\n"
+    "__<13>Sister Ilsabet:<7> I am Ilsabet, once a sister of the "
+    "cloth. I called upon my god at the end, and the ledger said "
+    "no. You already serve a power; mind the terms of service. "
+    "Favor is an account -- deeds that please your god are paid in, "
+    "aid you ask for is drawn out, and nothing is forgiven that was "
+    "not first recorded. Press <9>[p]<7> when you would pray." },
+  { "The Deep Game (your own character)", "Tutorial Guide VI",
+    "<13>A second hand keeps the margins of this journal -- small, "
+    "exact, browned with age.<7>\n\n"
+    "__It belonged to a scholar who mapped the game above the game: "
+    "conduct, parley, water, coin. The entries run to the deepest "
+    "page and stop. The hand did not stop because it ran out of "
+    "things to say." },
+};
+
+/* Hook the arc's Tutorial Guide effect's META() handlers onto the new
+   player as TRAP_EVENT stati, the same way Magic::Override
+   (src/Effects.cpp) installs an EA_OVERRIDE effect. The stati are
+   permanent, so they and the effect's per-player variables survive
+   save and load together. */
 static void InstallTutorialGuide(Player *pp) {
     rID eID; Annotation *a; int16 i;
 
-    eID = FIND("Tutorial Guide");
+    eID = FIND(TutorialArcs[TutorialArc-1].effect);
     if (!eID) {
-        Error("The loaded module has no Tutorial Guide effect!");
+        Error("The loaded module has no %s effect!",
+            TutorialArcs[TutorialArc-1].effect);
         return;
     }
     for (a = RES(eID)->FAnnot(); a; a = RES(eID)->NAnnot())
@@ -195,23 +279,9 @@ void Game::NewGame(rID mID, bool reincarnate) {
             excessItems[i] = 0;
         }
 
-    if (InTutorial) {
+    if (TutorialArc) {
         InstallTutorialGuide(pp);
-        T1->Box(XPrint(
-            "<13>You are not the first.<7>\n\n"
-            "__The one who watches you from beside the stairs wore a caravan "
-            "guard's colors once. He still stands like a man on duty.\n\n"
-            "__<13>Hadric:<7> Recruit. I guarded salt wagons out of Mohandi "
-            "for twenty years and died in this room with my shield still on "
-            "my back, so attend: the <9>@<7> on the map is you. Walk with "
-            "the arrow keys or the number pad. Walk into a goblin and you "
-            "have attacked it -- that is all the swordsmanship the first "
-            "day needs.\n\n"
-            "__Two signs before any other. <9>[?]<7> opens the manual; "
-            "every word in it was paid for in blood, most of it ours. "
-            "<9>[Esc]<7> opens the game menu, where a living soul can save "
-            "and walk away. The dead recommend it highly.\n\n"
-            "__Now move."));
+        T1->Box(XPrint(TutorialArcs[TutorialArc-1].welcome));
     }
 }
 
@@ -2207,9 +2277,12 @@ Redraw:
     do {
         T1->SetMode(MO_SPLASH);
         if (TutorialRequested) {
-            /* Set by the front end (IncEngineConfig.tutorial) before this
-               menu first draws; go straight into the tutorial game. */
-            TutorialRequested = false;
+            /* Set by the front end (IncEngineConfig.tutorial, an arc
+               number) before this menu first draws; go straight into
+               that arc's tutorial game. */
+            TutorialArc = (int16)min(TutorialRequested,
+                (int16)TUTORIAL_LAST_ARC);
+            TutorialRequested = 0;
             i = 10;
             goto Dispatch;
         }
@@ -2225,7 +2298,7 @@ Redraw:
         T1->LOption("Quit Incursion Completely",7);
         /* Appended after the historical entries so that their menu letters,
            which keyscripts under tools/keys select by, do not shift. */
-        T1->LOption("Begin the Tutorial",10);
+        T1->LOption("Play a Tutorial",10);
 #ifdef DEBUG
         T1->LOption("(Debugging Commands)",99);
 #endif
@@ -2340,21 +2413,35 @@ Dispatch:
             Cleanup();
             break;
         case 10:
-            if (!LoadModules())
-                break;
-            if (!FIND("Tutorial Guide")) {
-                /* A module compiled before the tutorial existed. */
-                T1->Box("This copy's game data (mod/Incursion.Mod) predates "
-                    "the tutorial. Recompile or reinstall the module to "
-                    "play the guided tutorial.");
-                Cleanup();
+            if (!TutorialArc) {
+                /* Chosen from the splash menu rather than the front
+                   end: list the arcs. Letters are stable (a, b, ...)
+                   for keyscripts and the Mac Game submenu. */
+                for (i=0;i!=TUTORIAL_LAST_ARC;i++)
+                    T1->LOption(TutorialArcs[i].option,i+1);
+                i = (int16)T1->LMenu(MENU_2COLS|MENU_ESC|MENU_REDRAW,
+                    "-- The Tutorials, in order -- ",WIN_CUSTOM);
+                if (i == -2)
+                    goto Redraw;
+                TutorialArc = i;
+            }
+            if (!LoadModules()) {
+                TutorialArc = 0;
                 break;
             }
-            InTutorial = true;
+            if (!FIND(TutorialArcs[TutorialArc-1].effect)) {
+                /* A module compiled before this arc existed. */
+                T1->Box("This copy's game data (mod/Incursion.Mod) predates "
+                    "this tutorial arc. Recompile or reinstall the module "
+                    "to play it.");
+                Cleanup();
+                TutorialArc = 0;
+                break;
+            }
             NewGame(0,false);
             Play();
             Cleanup();
-            InTutorial = false;
+            TutorialArc = 0;
             break;
         case 7:
             goto Quit;

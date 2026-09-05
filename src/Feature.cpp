@@ -480,14 +480,18 @@ EvReturn Door::Event(EventInfo &e) {
                         DoorFlags &= ~DF_LOCKED;
                         RemoveStati(TRIED,SS_MISC,SK_LOCKPICKING); 
 
-                        if (!HasStati(TRIED,DF_LOCKED,this) && 
+                        if (!HasStati(TRIED,DF_LOCKED,this) &&
                             !HasStati(SUMMONED,-1,this)) {
-                                // see DisarmTrap() 
+                                // see DisarmTrap()
                                 e.EActor->GainXP(90 + (diff - 14) * 10);
                                 GainPermStati(TRIED,this,SS_ATTK,DF_LOCKED);
                         }
+                        /* Port addition, not an upstream event: EV_PICKLOCK
+                           lets the guided tutorial observe a picked lock;
+                           the original engine throws nothing here. */
+                        Throw(EV_PICKLOCK, e.EActor, this);
 
-                } else { 
+                } else {
                     e.EActor->IDPrint("You fail to pick the lock on the <Obj2>. (You can try again after resting.)",
                         "The <Obj1> tries to pick the lock on the <Obj2>, but fails.",
                         e.EActor, this);

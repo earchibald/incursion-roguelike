@@ -53,13 +53,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         EngineHost.shared.onFrame = { [weak self] in
             self?.gridView.refresh()
         }
-        // INCURSION_START_TUTORIAL=1 skips the splash menu into the guided
-        // tutorial -- same launch-seam pattern as INCURSION_OPEN_HELP below.
-        let wantTutorial = ProcessInfo.processInfo
-            .environment["INCURSION_START_TUTORIAL"] == "1"
+        // INCURSION_START_TUTORIAL=<arc 1-6> skips the splash menu into
+        // that tutorial arc -- same launch-seam pattern as
+        // INCURSION_OPEN_HELP below.
+        let tutorialArc = Int32(ProcessInfo.processInfo
+            .environment["INCURSION_START_TUTORIAL"] ?? "") ?? 0
         EngineHost.shared.start(directory: dir,
                                 gridW: Int32(gridW), gridH: Int32(gridH),
-                                tutorial: wantTutorial)
+                                tutorial: tutorialArc)
         Narrator.attach()
 
         // Redraw the map whenever the working tileset changes, from the
@@ -106,12 +107,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
     /// both of the game's keysets (Standard and Roguelike) get a menu item.
     @objc func sendEscape(_ sender: Any?) { EngineHost.shared.pushKey(27, mods: 0) }
 
-    /// Starts the guided tutorial by selecting its entry on the engine's
-    /// splash menu. The entry's menu letter depends on the keyset option,
-    /// so read that from the same Options.Dat the engine reads (byte 202,
-    /// OPT_ROGUELIKE; the file is a flat int8[900] indexed by OPT_*).
-    /// Mid-game the splash menu does not exist, so ask the player to exit
-    /// to it first rather than doing anything destructive on their behalf.
+    /// Starts a tutorial arc (the sender's tag, 1-6) by selecting the
+    /// "Play a Tutorial" entry on the engine's splash menu and then the
+    /// arc's entry on the arc menu it opens. Menu letters depend on the
+    /// keyset option, so read that from the same Options.Dat the engine
+    /// reads (byte 202, OPT_ROGUELIKE; the file is a flat int8[900]
+    /// indexed by OPT_*). Mid-game the splash menu does not exist, so
+    /// ask the player to exit to it first rather than doing anything
+    /// destructive on their behalf.
     @objc func startTutorial(_ sender: Any?) {
         let splashMode = 1  // MO_SPLASH, inc/Term.h
         guard EngineHost.shared.currentFrame()?.mode == splashMode else {
@@ -119,7 +122,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
             alert.messageText = "Finish this game first"
             alert.informativeText = "The tutorial starts from the opening "
                 + "menu. Save and exit your current game (Esc \u{2192} "
-                + "Save and Quit), then choose Start Tutorial again."
+                + "Save and Quit), then choose the tutorial again."
             alert.runModal()
             return
         }
@@ -129,11 +132,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
            opts.count > 202 {
             roguelikeKeys = opts[202] != 0
         }
-        // "Begin the Tutorial" is the 9th splash entry: letter table
-        // "abcdefghi..." standard, "acdefgimo..." roguelike (TextTerm.cpp).
-        let letter: UInt8 = roguelikeKeys ? UInt8(ascii: "m")
-                                          : UInt8(ascii: "i")
-        EngineHost.shared.pushKey(Int32(letter), mods: 0)
+        // Menu entries take letters from the keyset's letter table
+        // (TextTerm.cpp): "abcdefghi..." standard, "acdefgimo..."
+        // roguelike. "Play a Tutorial" is the 9th splash entry; the six
+        // arcs are entries 1-6 of the arc menu.
+        let letters = roguelikeKeys ? "acdefgimo" : "abcdefghi"
+        let arc = max(1, min(6, (sender as? NSMenuItem)?.tag ?? 1))
+        let splash = Array(letters.utf8)[8]
+        let arcKey = Array(letters.utf8)[arc - 1]
+        EngineHost.shared.pushKey(Int32(splash), mods: 0)
+        EngineHost.shared.pushKey(Int32(arcKey), mods: 0)
     }
     @objc func sendInventory(_ sender: Any?) { EngineHost.shared.pushKey(Int32(UInt8(ascii: "i")), mods: 0) }
     @objc func sendMessages(_ sender: Any?) { EngineHost.shared.pushKey(Int32(UInt8(ascii: "v")), mods: 0) }
@@ -326,8 +334,25 @@ appItem.submenu = appMenu
 let gameItem = NSMenuItem()
 mainMenu.addItem(gameItem)
 let gameMenu = NSMenu(title: "Game")
-gameMenu.addItem(withTitle: "Start Tutorial",
-                 action: #selector(AppDelegate.startTutorial(_:)), keyEquivalent: "")
+// One item per tutorial arc, in ladder order; the tag is the arc number
+// the engine's arc menu lists them under (src/Main.cpp, TutorialArcs).
+let tutorialItem = NSMenuItem(title: "Play a Tutorial", action: nil,
+                              keyEquivalent: "")
+let tutorialMenu = NSMenu(title: "Play a Tutorial")
+for (arc, title) in [(1, "1. First Steps (human warrior)"),
+                     (2, "2. Eyes Open (halfling rogue)"),
+                     (3, "3. At Range (elf archer)"),
+                     (4, "4. First Spells (human mage)"),
+                     (5, "5. Faith and Favor (human priest)"),
+                     (6, "6. The Deep Game (your own character)")] {
+    let item = NSMenuItem(title: title,
+                          action: #selector(AppDelegate.startTutorial(_:)),
+                          keyEquivalent: "")
+    item.tag = arc
+    tutorialMenu.addItem(item)
+}
+tutorialItem.submenu = tutorialMenu
+gameMenu.addItem(tutorialItem)
 gameMenu.addItem(withTitle: "Game Menu (Esc)",
                  action: #selector(AppDelegate.sendEscape(_:)), keyEquivalent: "")
 gameMenu.addItem(.separator())

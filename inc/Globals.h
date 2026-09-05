@@ -109,14 +109,22 @@ extern int16 LastSkillCheckResult;
 extern Game* theGame;
 extern Registry* theRegistry;
 
-/* Tutorial mode. TutorialRequested asks StartMenu to launch the guided
-   tutorial game on its next pass (set from the splash menu, or by the
-   front end at startup). InTutorial is true from tutorial game setup
-   until that game ends; character creation uses it to preset every
-   choice. Neither is saved: a reloaded tutorial game continues through
-   the Tutorial Guide effect's own persistent state. */
-extern bool TutorialRequested;
-extern bool InTutorial;
+/* Tutorial mode. TutorialRequested asks StartMenu to launch that arc's
+   guided tutorial game on its next pass (set by the front end at
+   startup); TutorialArc is the arc in play, from tutorial game setup
+   until that game ends. Both are arc numbers, 0 for off. Character
+   creation presets every choice for the preset arcs (1 to
+   TUTORIAL_LAST_PRESET_ARC); the last arc narrates the strategic layer
+   over a normally created character. Neither variable is saved: a
+   reloaded tutorial game continues through its Tutorial Guide effect's
+   own persistent state. */
+#define TUTORIAL_LAST_ARC        6
+#define TUTORIAL_LAST_PRESET_ARC 5
+extern int16 TutorialRequested;
+extern int16 TutorialArc;
+/* True when chargen must preset every choice for the tutorial. */
+#define TutorialPreset() \
+    (TutorialArc && TutorialArc <= TUTORIAL_LAST_PRESET_ARC)
 extern Registry MainRegistry, ResourceRegistry;
 
 extern rID Candidates[2048];

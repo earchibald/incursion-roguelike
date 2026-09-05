@@ -80,7 +80,59 @@ String & PickName(const char*NameList) {
 
 hObj excessItems[30];
 
-bool isExploreMode(Player *p) { 
+/* One row per preset tutorial arc (1..TUTORIAL_LAST_PRESET_ARC): the
+   fixed character that arc's walkthrough is written around. A new arc
+   adds a row, not new control flow. Design:
+   docs/superpowers/specs/2026-08-19-tutorial-arcs.md. */
+struct TutorialSpec {
+    const char *race, *cls;   /* resource names for FIND() */
+    int8  attrs[7];           /* STR DEX CON INT WIS CHA LUC */
+    int16 skills[9];          /* 0-terminated; ranks min(4,MaxRanks) */
+    int16 feats[4];           /* 0-terminated; granted in order */
+    const char *focusWeapon;  /* FT_WEAPON_FOCUS / _PROFICIENCY param */
+    const char *god;          /* NULL = no preset god */
+    const char *domains[3];   /* with a god: the three domain picks */
+};
+static const TutorialSpec TutorialSpecs[TUTORIAL_LAST_PRESET_ARC] = {
+  /* 1: First Steps -- human warrior */
+  { "human;race", "Warrior", { 16,14,16,10,12,8,12 },
+    { SK_ATHLETICS, SK_CLIMB, SK_HEAL, SK_SPOT, SK_INTUITION, 0 },
+    { FT_TOUGHNESS, FT_ALERTNESS, FT_IMPROVED_INITIATIVE, 0 },
+    "long sword", NULL, { NULL, NULL, NULL } },
+  /* 2: Eyes Open -- halfling rogue */
+  { "halfling;race", "Rogue", { 10,17,14,12,12,10,14 },
+    { SK_HIDE, SK_MOVE_SIL, SK_LOCKPICKING, SK_SEARCH, SK_SPOT,
+      SK_LISTEN, SK_HANDLE_DEV, SK_TUMBLE, 0 },
+    { FT_ALERTNESS, FT_DODGE, FT_TOUGHNESS, 0 },
+    "short sword", NULL, { NULL, NULL, NULL } },
+  /* 3: At Range -- elf archery ranger (the style ChoicePrompt takes
+     'a' through the Player::ChoicePrompt preset, inc/Inline.h) */
+  { "elf;race", "Ranger", { 12,16,12,10,14,10,12 },
+    { SK_SPOT, SK_LISTEN, SK_HIDE, SK_MOVE_SIL, SK_SEARCH,
+      SK_WILD_LORE, SK_HEAL, SK_CLIMB, 0 },
+    { FT_POINT_BLANK_SHOT, FT_PRECISE_SHOT, FT_TOUGHNESS, 0 },
+    "long bow", NULL, { NULL, NULL, NULL } },
+  /* 4: First Spells -- human abjurer (school preset in GainAbility;
+     abjuration's free spells, shield and mage armour, are the buffs
+     the walkthrough teaches) */
+  { "human;race", "Mage", { 8,14,14,16,12,10,12 },
+    { SK_CONCENT, SK_SPELLCRAFT, SK_KNOW_MAGIC, SK_DECIPHER,
+      SK_USE_MAGIC, 0 },
+    { FT_TOUGHNESS, FT_COMBAT_CASTING, FT_ALERTNESS, 0 },
+    "quarterstaff", NULL, { NULL, NULL, NULL } },
+  /* 5: Faith and Favor -- human priest of Ekliazeh, the one god who
+     is True Neutral-legal, prompt-free (GF_FORCE_TURN skips the
+     turn-or-command question) and mild of conduct */
+  { "human;race", "Priest", { 12,10,14,10,16,12,12 },
+    { SK_CONCENT, SK_HEAL, SK_INTUITION, SK_KNOW_THEO,
+      SK_SPELLCRAFT, 0 },
+    { FT_TOUGHNESS, FT_COMBAT_CASTING, FT_ALERTNESS, 0 },
+    "warhammer", "Ekliazeh",
+    { "Strength", "Protection;domain", "Community" } },
+};
+#define TutSpec (TutorialSpecs[TutorialArc-1])
+
+bool isExploreMode(Player *p) {
     if (p->Opt(OPT_BEGINKIT) ||
         p->Opt(OPT_MAX_MANA) ||
         p->Opt(OPT_MAX_HP) ||
@@ -114,7 +166,7 @@ void Player::Create(bool reincarnate) {
         SkillRanks[i] = 0;
 
     MyTerm->SetMode(MO_PLAY);
-    if (InTutorial) {
+    if (TutorialPreset()) {
         /* The guided tutorial makes every chargen choice itself. These
            per-player option values suppress the gender and subrace prompts
            below and set the wiki's beginner-recommended settings: the
@@ -131,7 +183,7 @@ void Player::Create(bool reincarnate) {
         Options[OPT_GENDER]          = 3; /* random */
         Options[OPT_SUBRACES]        = 0;
     }
-    if (!reincarnate && !InTutorial) {
+    if (!reincarnate && !TutorialPreset()) {
         if (yn("Alter the character generation options?")) {
 RedoOptions:
             MyTerm->SetMode(MO_SPLASH);
@@ -197,12 +249,13 @@ RepeatRace:
     MyTerm->ShowTraits(); MyTerm->ShowStatus();
     MyTerm->SetWin(WIN_CREATION);
 
-    if (InTutorial) {
-        /* Humans are the vanilla race: no birth-event prompts, no
-           subraces to explain, a bonus feat and skill points. */
-        RaceID = FIND("human;race");
+    if (TutorialPreset()) {
+        /* The arc's fixed race. Subraces and the birth-event prompts
+           are suppressed by the option preset above; every race in
+           the spec table has a prompt-free birth script. */
+        RaceID = FIND(TutSpec.race);
         if (!RaceID)
-            Fatal("The tutorial needs the human race resource!");
+            Fatal("The tutorial needs the %s resource!",TutSpec.race);
         goto SkipSubraces;
     }
 
@@ -315,12 +368,11 @@ SkipSubraces:
     MyTerm->SetWin(WIN_CREATION);
 
 RepeatClass:
-    if (InTutorial) {
-        /* Warriors have no god, no spells and no supernatural systems to
-           learn -- the class the walkthrough is written around. */
-        ClassID[0] = FIND("Warrior");
+    if (TutorialPreset()) {
+        /* The class each arc's walkthrough is written around. */
+        ClassID[0] = FIND(TutSpec.cls);
         if (!ClassID[0])
-            Fatal("The tutorial needs the Warrior class resource!");
+            Fatal("The tutorial needs the %s class resource!",TutSpec.cls);
         goto ClassChosen;
     }
     i = 0;
@@ -391,8 +443,10 @@ ClassChosen:
 
     Level[0] = 0;
 
-    if (InTutorial) {
-        /* True Neutral: the one alignment with no conduct to break. */
+    if (TutorialPreset()) {
+        /* True Neutral: the one alignment with no conduct to break.
+           The priest arc's god, Ekliazeh, permits it (GF_NO_CHAOTIC
+           only bars Chaotic). */
         for (i=0;i<9;i++)
             if (!(AlignmentInfo[i].align & (AL_LAWFUL|AL_CHAOTIC|AL_GOOD|AL_EVIL)))
                 break;
@@ -488,17 +542,15 @@ AlignmentChosen:
     MyTerm->ShowTraits(); MyTerm->ShowStatus();
     MyTerm->SetWin(WIN_CREATION);
 
-    if (!reincarnate && InTutorial) {
-        /* A plain melee spread: all warrior class skills, so every rank
+    if (!reincarnate && TutorialPreset()) {
+        /* Each arc's spread uses its class's own skills, so every rank
            costs one point and caps at level + 3. Whatever the preset
            over- or under-spends, marking all pools spent below keeps the
            character legal, exactly as the reincarnation path does. */
-        static const int16 TutorialSkills[] =
-            { SK_ATHLETICS, SK_CLIMB, SK_HEAL, SK_SPOT, SK_INTUITION, 0 };
         CalcSP();
-        for (i=0;TutorialSkills[i];i++)
-            SkillRanks[TutorialSkills[i]] =
-                (int8)min(4,MaxRanks(TutorialSkills[i]));
+        for (i=0;TutSpec.skills[i];i++)
+            SkillRanks[TutSpec.skills[i]] =
+                (int8)min(4,MaxRanks(TutSpec.skills[i]));
         CalcSP();
         SpentSP[0] = TotalSP[0];
         SpentSP[1] = TotalSP[1];
@@ -674,7 +726,7 @@ SkipThisFocus:;
     // the Enneagram, don't serve a purpose. Let's replace this with an
     // alignment choice, which does matter (monsters have unholy weapons,
     // there are magic circles vs evil, etc.). 
-    if (InTutorial) {
+    if (TutorialPreset()) {
         Personality = 0; /* colour only; any value serves */
         goto PersonalityChosen;
     }
@@ -1413,12 +1465,11 @@ void Player::RollAttributes() {
         return;
     }
 
-    if (InTutorial) {
-        /* A sturdy fixed array: strong, tough, unremarkable elsewhere. */
-        static const int8 TutorialAttrs[7] =
-            { 16, 14, 16, 10, 12, 8, 12 }; /* STR DEX CON INT WIS CHA LUC */
+    if (TutorialPreset()) {
+        /* The arc's fixed array: sound for its class, unremarkable
+           elsewhere. */
         for (i = 0; i != 7; i++)
-            Attr[i] = BAttr[i] = TutorialAttrs[i];
+            Attr[i] = BAttr[i] = TutSpec.attrs[i];
         statMethod = 0;
         return;
     }
@@ -1763,9 +1814,23 @@ void Player::ChooseDomains()
 {
     String name, desc;
     int16 i, j, n, q;
-    int choices = 3; 
+    int choices = 3;
     static EventInfo xe;
-    TGod * god = TGOD(GodID); 
+    TGod * god = TGOD(GodID);
+
+    if (TutorialPreset() && TutSpec.god &&
+        MyTerm->GetMode() == MO_CREATE) {
+        /* The arc's preset domains, granted the way the menu below
+           grants its picks. */
+        for (i=0;i!=3;i++) {
+            rID dID = FIND(TutSpec.domains[i]);
+            if (!dID)
+                Fatal("The tutorial needs the domain %s!",
+                    TutSpec.domains[i]);
+            GainPermStati(HAS_DOMAIN,this,SS_CLAS,0,0,dID);
+        }
+        return;
+    }
 
     /* Multitude kludge */
     /* ww: there was a kludge for The Multitude that
@@ -2217,6 +2282,16 @@ void Player::ChooseGod(bool required) {
     String desc;
     bool worthy;
 
+    if (TutorialPreset() && TutSpec.god &&
+        MyTerm->GetMode() == MO_CREATE) {
+        /* The arc's preset god; the menu's only effects are these. */
+        GodID = FIND(TutSpec.god);
+        if (!GodID)
+            Fatal("The tutorial needs the god %s!",TutSpec.god);
+        setGodFlags(GodID, GS_INVOLVED);
+        return;
+    }
+
     i = 0;
     /* First look to the class for a restricted list of allowed gods, and if
        that doesn't exist, find and create a list of all gods in any module. */
@@ -2583,21 +2658,19 @@ Restart:
 
     /* At tutorial creation only -- level-ups during tutorial play use the
        real menus, which is the point of the walkthrough. */
-    if (InTutorial && MyTerm->GetMode() == MO_CREATE) {
+    if (TutorialPreset() && MyTerm->GetMode() == MO_CREATE) {
         if (feat < FT_FIRST) {
-            static const int16 TutorialFeats[] =
-                { FT_TOUGHNESS, FT_ALERTNESS, FT_IMPROVED_INITIATIVE, 0 };
-            for (i=0;TutorialFeats[i];i++)
-                if (!HasFeat(TutorialFeats[i]) && FeatPrereq(TutorialFeats[i])) {
-                    feat = TutorialFeats[i];
+            for (i=0;TutSpec.feats[i];i++)
+                if (!HasFeat(TutSpec.feats[i]) && FeatPrereq(TutSpec.feats[i])) {
+                    feat = TutSpec.feats[i];
                     break;
                 }
             if (feat < FT_FIRST)
                 return; /* preset list exhausted; grant nothing extra */
         }
-        /* The warrior's birth script asks which weapon to focus on. */
+        /* Some birth scripts ask which weapon to focus on. */
         if (!param && (feat == FT_WEAPON_FOCUS || feat == FT_WEAPON_PROFICIENCY))
-            param = FIND("long sword");
+            param = FIND(TutSpec.focusWeapon);
         /* The human race's SK_ANY skill slot asks which skill to adopt. */
         if (!param && feat == FT_NATURAL_APTITUDE)
             param = SK_LISTEN;
@@ -3175,6 +3248,11 @@ DoCAStati:
         StatiIterEnd(this)
 
         if (pa >= MA_CHOICE1 && pa <= MA_CHOICE5) {
+            if (TutorialPreset() && MyTerm->GetMode() == MO_CREATE) {
+                /* The tutorial ranger tracks the caves' natives. */
+                j = MA_GOBLINOID;
+                goto ChoseMType;
+            }
             // ww: let's restructure this a bit, because RangerEnemies
             // falls out of sync with what's really there ...
             for (i=0; FavEnemies[i]; i++) {
@@ -3241,6 +3319,7 @@ Found:
                 }
             } 
             j = (int16)MyTerm->LMenu(MENU_SORTED|MENU_2COLS|MENU_DESC|MENU_BORDER,MTypePrompt);
+ChoseMType:;
 #if 0
             do { 
                 j = MyTerm->MonsterTypePrompt(MTypePrompt,10,50);
@@ -3266,6 +3345,14 @@ Found:
         break;
     case CA_SPECIALIST:
         if (!Abilities[ab]) {
+            if (TutorialPreset() && MyTerm->GetMode() == MO_CREATE) {
+                /* School 0, abjuration: its free spells (shield, mage
+                   armour) are the buffs the walkthrough teaches. */
+                GainPermStati(SPECIALTY_SCHOOL,NULL,(int8)statiSource,
+                    0,0,sourceID);
+                Abilities[ab] += (uint8)pa;
+                break;
+            }
             for(i=0;i!=9;i++) {
                 if (isMType(MA_ELF) && XBIT(i) == SC_NEC)
                     continue;
@@ -4381,6 +4468,7 @@ void Player::LearnSpell(bool left) {
 
     areSpells = false;
     areBookSpells = false;
+    int16 firstPick = -1;
     for (i=0;ls[i].spID;i++) {
         /* Elves can't learn Necromancy spells. */
         if (isMType(MA_ELF) && (TEFF(ls[i].spID)->Schools & SC_NEC)
@@ -4473,6 +4561,9 @@ HasComponent:
         if (noBook)
             menu_name = Format("%c%s%c", -BLUE, (const char*)menu_name, -GREY);
 
+        if (!noBook && firstPick < 0)
+            firstPick = i;
+
         MyTerm->LOption(menu_name,
             noBook ? (-(i+10)) : i,
             TEFF(ls[i].spID)->Describe(thisp),
@@ -4511,9 +4602,18 @@ OpenSlot:
     else
         prompt = "Learn which spell?";
 
-    i = (int16)MyTerm->LMenu(MENU_SORTED|MENU_3COLS|MENU_ESC|MENU_DESC|MENU_BORDER,prompt,WIN_MENUBOX,"help::magic,LE");    
-    if (i == -1)
-        return;
+    if (TutorialPreset() && MyTerm->GetMode() == MO_CREATE &&
+        firstPick >= 0) {
+        /* The tutorial auto-picks the first learnable spell the
+           character has access to; module order keeps the picks
+           stable across runs. The filters above have already run. */
+        MyTerm->LOptionClear();
+        i = firstPick;
+    } else {
+        i = (int16)MyTerm->LMenu(MENU_SORTED|MENU_3COLS|MENU_ESC|MENU_DESC|MENU_BORDER,prompt,WIN_MENUBOX,"help::magic,LE");
+        if (i == -1)
+            return;
+    }
 
     if (i < 0) {
         IPrint("You don't have a spellbook for that spell.");

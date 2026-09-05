@@ -1,7 +1,11 @@
 # Tutorial Arcs
 
 A ladder of guided tutorials, from first keystrokes to the deep game.
-Arc 1 shipped with commit 84277ff. This document plots the rest.
+Arc 1 shipped with commit 84277ff; arcs 2-6 are implemented (guide
+effects in `lib/tutorial.irh`, presets in the `TutorialSpecs` table in
+`src/Create.cpp`, arc menu in `src/Main.cpp`, Mac submenu in
+`macapp/Sources/IncursionApp/main.swift`). Trigger deltas found at
+implementation are recorded in `2026-08-22-tutorial-scripts.md`.
 
 Sources: the vendored Incursion Wiki guides (`macapp/Resources/Help/wiki/`,
 CC BY-SA 3.0), chiefly *General Tips for Survival* and the *FAQ*. Where an

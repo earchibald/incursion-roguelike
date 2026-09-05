@@ -4574,6 +4574,11 @@ typedef signed int        hObj;
 #define EV_ENSELECT_TEMPS 190
 #define EV_ENGEN_MOUNT  191
 #define EV_ENGEN_ALIGN  192
+/* Port addition, not an upstream event: thrown so the guided tutorial
+   can observe a moment the original engine kept internal. (EV_PICKLOCK
+   above is upstream's, thrown only by the Knock spell; the tutorial
+   adds throws of it at the manual lockpick sites.) */
+#define EV_GUILT        193
 
 #define MSG_BLASTNAME   200  /* "fireball", "hail of burning stones" */
 #define MSG_CHATTER     201 

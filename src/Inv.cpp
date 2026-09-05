@@ -1182,9 +1182,13 @@ EvReturn Container::PickLock(EventInfo &e)
       // see DisarmTrap() 
       e.EActor->GainXP(90 + (diff - 14) * 10);
       GainPermStati(TRIED,this,SS_ATTK,DF_LOCKED);
-    } 
-    return NOTHING; 
-  } else { 
+    }
+    /* Port addition, not an upstream event: EV_PICKLOCK lets the
+       guided tutorial observe a picked lock; the original engine
+       throws nothing at this moment. */
+    Throw(EV_PICKLOCK, e.EActor, NULL, this);
+    return NOTHING;
+  } else {
     e.EActor->IDPrint("You fail to pick the lock on the <Obj2>. (You can try again after resting.)",
         "The <Obj1> tries to pick the lock on the <Obj2>, but fails.",
         e.EActor, this);

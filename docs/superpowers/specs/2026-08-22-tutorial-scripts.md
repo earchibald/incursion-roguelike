@@ -12,6 +12,30 @@ every key cited was verified against the standard keyset
 vendored wiki. A final truth pass runs at implementation, when each
 trigger is wired and observable.
 
+## Implementation notes (2026-09-05)
+
+All five arcs are implemented in `lib/tutorial.irh` (effects "Tutorial
+Guide II" through "VI") over the arc infrastructure in `src/Main.cpp`
+(TutorialArcs table) and `src/Create.cpp` (TutorialSpecs presets).
+Where the engine survey contradicted a trigger named below, the
+implementation differs; the implemented trigger is authoritative:
+
+| Beat | Trigger as implemented |
+|---|---|
+| 2/tHearth | `META(POST(EV_ACTIVATE))` guarded on `EItem->ieID` -- item use throws EV_ACTIVATE, not EV_INVOKE |
+| 2/tTrap | `META(POST(EV_EFFECT))` guarded on `EItem->isType(T_TRAP)` -- trap squares surface only as their effect |
+| 2/tLock | `META(EV_PICKLOCK)` -- the event existed upstream (Knock spell only); port-addition throws added at the manual pick sites (`src/Inv.cpp`, `src/Feature.cpp`) |
+| 5/tUneasy | `META(EV_TURN)` poll of `getGodAnger()` -- "uneasy" is a message, not a stati |
+| 5/tGuilty, 6/tConduct | `META(EV_GUILT)` -- a port-addition event (`inc/Defines.h:193`) thrown from `Character::AlignedAct` when guilt or foolishness is recorded |
+| 5/tCleric | poll also requires `HasMFlag(M_CASTER)` -- god alone matched ordinary worshippers |
+| 5/tAltar, 6/tForge | `META(EV_TURN)` poll of `FFeatureAt` under the player -- EV_ENTER is portal-only |
+| 6/tFountain | `META(EV_TURN)` poll for a `T_FOUNTAIN` item within one square |
+| 6/tMulti | `META(EV_TURN)` poll of `TotalLevel() >= 8` -- level-up events bypass the trap dispatcher |
+| 6/tLast | `META(POST(EV_DESCEND))` guarded on `EMap->Depth >= 4` |
+| 3/tMiss | guarded on the event weapon being a bow or missile |
+| 3/tKite | poll compares `mID->Mov` of a visible hostile against the player's |
+| 3/tCompanion | rest beat fires only if a creature on the map has the player as leader |
+
 ---
 
 ## Arc 2 — Eyes Open (Perrin Underbough, halfling rogue)

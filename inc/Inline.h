@@ -559,9 +559,15 @@ inline Dir OppositeDir(Dir d)
     }
   }
 
-inline int8 Player::ChoicePrompt(const char*msg, const char*choices, char def, 
+inline int8 Player::ChoicePrompt(const char*msg, const char*choices, char def,
                       int8 col1,int8 col2, bool preprompt)
-  { return MyTerm->ChoicePrompt(msg,choices,col1,col2,preprompt); }
+  { /* The guided tutorial's preset arcs answer chargen prompts with the
+       first choice; scripts order their choice strings accordingly (the
+       ranger's "ast" style prompt takes 'a', archery). Play-time
+       prompts are untouched. */
+    if (TutorialPreset() && MyTerm->GetMode() == MO_CREATE)
+        return choices[0];
+    return MyTerm->ChoicePrompt(msg,choices,col1,col2,preprompt); }
 
 inline Thing* GetHandle(Thing *t)
   { return t; }

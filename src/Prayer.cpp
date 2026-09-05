@@ -2135,7 +2135,13 @@ EvReturn Character::AlignedAct(EventInfo &e)
       }
       
     SkipGuiltMessages:
-      
+
+    /* Port addition, not an upstream event: EV_GUILT lets the guided
+       tutorial observe a transgression against the character's own
+       alignment, a moment the original engine kept internal. */
+    if (isGuilty || isFoolish)
+      Throw(EV_GUILT, this);
+
     if (nAlign != cAlign) {
       String msg;
       if (!nAlign) 
